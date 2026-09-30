@@ -43,6 +43,7 @@ app/frontend/
 │   ├── pedidos/[id]/page.tsx     # "/pedidos/<uuid>"  → Vista 3: módulos de un pedido
 │   ├── modulos/[id]/page.tsx     # "/modulos/<uuid>"  → Vista 4: piezas de un módulo
 │   ├── escaneo/page.tsx          # "/escaneo"      → Vista 5: cámara para escanear
+│   ├── loading.tsx               # Pantalla de carga (tres puntos) mientras una página pide sus datos
 │   └── layout.tsx                # Estructura común a todas las páginas (fuente, tema, notificaciones)
 ├── modules/                     # Un módulo por concepto de negocio (igual criterio que el backend)
 │   ├── orden/
@@ -51,7 +52,10 @@ app/frontend/
 │   └── pieza/
 ├── components/
 │   ├── ui/                       # Componentes genéricos de shadcn/ui (botón, tabla, diálogo...) sin lógica de negocio
-│   └── estado-badge.tsx           # La "etiqueta" de color que muestra el estado (Pendiente/En proceso/Finalizado...)
+│   ├── estado-badge.tsx           # La "etiqueta" de color del estado: Pendiente (outline blanco), En proceso/En producción (bronce), Finalizado/Cortada/Lista (verde)
+│   ├── confirm-action-button.tsx  # Botón + diálogo Aceptar/Cancelar. TODA acción que modifica datos pasa por acá (con `requireText`, además exige tipear una palabra)
+│   ├── column-filter.tsx           # Filtro de columna estilo Excel (lista de valores con checkbox + búsqueda)
+│   └── loading-dots.tsx            # Tres puntos que crecen y se achican (carga de páginas y botones)
 ├── lib/api/api-client.ts          # El único lugar del código que hace fetch() hacia el backend
 └── .env.local / .env.example
 ```
@@ -65,6 +69,8 @@ Dentro de cada `modules/<algo>/` vas a encontrar siempre:
 ├── actions/           # Funciones que llaman al backend para crear/modificar algo (Server Actions de Next.js)
 └── components/         # Las piezas de interfaz de ese módulo (tablas, botones, diálogos)
 ```
+
+Cada tabla tiene un componente `*-acciones.tsx` (`orden-acciones`, `pedido-acciones`, `modulo-acciones`, `pieza-acciones`) con los botones de su fila; todos se construyen con `ConfirmActionButton`.
 
 **Regla importante**: ningún componente llama `fetch()` directamente — todo pasa por `lib/api/api-client.ts` o por una `action`. Eso hace que, si el día de mañana cambia cómo se llama al backend (por ejemplo, se agrega autenticación), solo hay que tocar un lugar.
 
@@ -140,12 +146,35 @@ Para evitar este problema de raíz, lo ideal es pedir una **IP fija o una reserv
 
 ## Manual de usuario, vista por vista
 
+### Confirmación en cada acción
+
+Todo botón que modifica datos (finalizar, volver a pendiente, archivar, eliminar) abre primero un diálogo con **Cancelar** / **Aceptar**. La acción recién se ejecuta al aceptar; mientras corre, el botón muestra los tres puntos animados. Si el backend la rechaza (ej. por la regla de "Pendiente"), aparece un aviso con el motivo. Eliminar una orden pide además escribir la palabra `confirmar`.
+
+### Botones "Finalizado" y "Pendiente"
+
+Cada fila de las Vistas 2, 3 y 4 (y la orden en la Vista 1, solo "Pendiente") tiene dos botones:
+
+- **Finalizado**: marca el elemento como finalizado (en una pieza, la marca como cortada). Se deshabilita si ya lo está.
+- **Pendiente**: lo vuelve a Pendiente. Se deshabilita si ya está pendiente. Está sujeto a la regla del modelo hijo (el backend responde `409` y la app muestra el motivo):
+  - **Pieza**: siempre se puede.
+  - **Módulo**: solo si ninguna de sus piezas está finalizada.
+  - **Pedido**: solo si todos sus módulos están en Pendiente.
+  - **Orden**: solo si todos sus pedidos están en Pendiente.
+
+  Para deshacer un módulo con piezas cortadas hay que pasar primero cada pieza a Pendiente. Bajar un padre a Pendiente es siempre manual: no baja solo al deshacer su último hijo.
+
 ### Vista 1 — Listado de órdenes (`/`)
 
-La pantalla principal. Muestra una tabla con todas las órdenes de fabricación que ya se sincronizaron desde TeoWin: número de orden, descripción, cantidad de pedidos y estado.
+La pantalla principal. Muestra una tabla con las órdenes de fabricación sincronizadas desde TeoWin que **no están archivadas**: número de orden, descripción, cantidad de pedidos y estado.
 
+- **Buscador**: arriba de la tabla. Filtra mientras se escribe, por número de orden (el corto o el de fabricación) o por descripción; no distingue mayúsculas ni acentos.
 - **Botón "Agregar orden"**: abre un formulario para escribir el número de orden de fabricación (el que aparece impreso en la etiqueta de corte, ej. `263.500.002` → se escribe `263500002`). Al confirmar, trae desde TeoWin todos los pedidos, módulos y piezas de esa orden. Si el número no existe en TeoWin, o ya estaba cargado, avisa con un mensaje claro.
 - **Botón "Escanear"**: lleva a la Vista 5 (cámara).
+- **Botón "Ver archivadas" / "Ver activas"**: alterna entre el listado principal y las órdenes archivadas (`/?archivadas=1`).
+- **Por fila**:
+  - **Pendiente**: vuelve la orden a Pendiente (ver reglas arriba).
+  - **Archivar** / **Desarchivar**: oculta la orden del listado principal (o la trae de vuelta). No la elimina ni cambia su estado: sus piezas se siguen pudiendo escanear.
+  - **Eliminar**: elimina la orden con un borrado lógico (pide escribir `confirmar`). La orden, sus pedidos, módulos y piezas quedan marcados como eliminados pero el historial se conserva; las etiquetas ya impresas dejan de ser válidas; TeoWin no se toca. Después se puede volver a agregar el mismo número.
 - Click en el número de orden o en la descripción → entra a la Vista 2 de esa orden.
 
 ### Vista 2 — Pedidos de una orden (`/ordenes/:id`)
@@ -153,39 +182,46 @@ La pantalla principal. Muestra una tabla con todas las órdenes de fabricación 
 Los pedidos que forman parte de la orden seleccionada: número de pedido, cliente/referencia, cantidad de módulos y estado.
 
 - Click en el número de pedido o en el cliente → entra a la Vista 3 de ese pedido.
-- **Botón "Marcar finalizado"** por fila: lo usa logística para confirmar a mano que ese pedido ya está completo. Cuando **todos** los pedidos de una orden quedan finalizados, la orden pasa sola a "Lista".
+- **Finalizado / Pendiente** por fila. Cuando **todos** los pedidos de una orden quedan finalizados, la orden pasa sola a "Lista"; si después se vuelve uno a Pendiente, la orden vuelve a "En proceso".
 
 ### Vista 3 — Módulos de un pedido (`/pedidos/:id`)
 
-Los módulos (muebles) de ese pedido: id, descripción, cantidad de piezas y estado.
+Los módulos (muebles) de ese pedido: id, descripción, cantidad de tipos de pieza y estado.
 
 - Click en el id o en la descripción → entra a la Vista 4 de ese módulo.
-- **Botón "Marcar finalizado"** por fila: confirmación manual, igual que en pedidos.
+- **Finalizado / Pendiente** por fila.
 
 ### Vista 4 — Piezas de un módulo (`/modulos/:id`)
 
-El detalle más fino: cada pieza física de ese módulo, con su código de barras, nombre de artículo, color, medidas y estado individual (Pendiente / Cortada).
+El detalle más fino: cada pieza física de ese módulo con **Código** (el de la etiqueta; "—" si la pieza no tiene etiqueta), **Familia**, **Artículo**, **Descripción**, **Color**, **Medidas** y **Estado** individual (Pendiente / Cortada).
 
-- **Botón "Marcar finalizado"** por pieza: marca esa pieza como cortada a mano. Se usa para piezas que **nunca pasan por el escaneo de Rover** (fondos, tapajuntas) — es la única forma de darlas por resueltas.
+- **Filtros estilo Excel** en Familia, Artículo, Descripción, Color, Medidas y Estado (no en Código ni en la acción). Cada ícono de embudo abre una lista de valores con checkbox y un buscador. Los filtros se **combinan** entre columnas y son **dinámicos**: las opciones de cada columna se recalculan según los otros filtros activos. Arriba de la tabla se ve el conteo ("10 de 40 piezas") y un botón para limpiar todo.
+- **Finalizado / Pendiente** por pieza. "Finalizado" marca la pieza como cortada a mano: se usa para las piezas que **nunca pasan por el escaneo de Rover** (fondos, tapajuntas, paneles sin etiqueta) — es la única forma de darlas por resueltas.
 
 ### Vista 5 — Escaneo (`/escaneo`)
 
 Pantalla completa pensada para tablet, con la cámara ocupando toda la pantalla ("modo continuo": no hay que tocar nada entre un escaneo y otro, la cámara queda siempre escuchando).
 
+- **Mira**: un rectángulo con esquinas marcadas y una línea de barrido, con el resto de la imagen atenuada, para apuntar el código de barras. Es solo una guía visual: el lector busca el código en todo el cuadro.
 - Apunta la cámara al código de barras de la etiqueta de corte (siempre 7 dígitos).
-- Al reconocer un código válido, aparece abajo un cartel con el resumen: qué pieza es, de qué módulo, pedido y orden — y automáticamente:
-  - Esa pieza pasa a "Cortada".
-  - Si era la primera pieza escaneada de ese módulo/pedido/orden, todos suben de "Pendiente" a "En producción" (o "En proceso" en el caso de la orden).
-- Si el código no corresponde a ninguna pieza (o pertenece a una orden que fue descartada), aparece un cartel de error en vez del resumen — la cámara sigue funcionando, no hay que reiniciar nada.
+- Al reconocer un código válido, aparece abajo un cartel con el resumen (orden, pedido, pieza, medidas, color, código y el módulo con su id entre paréntesis):
+  - **Verde** ("Pieza registrada"): la pieza era nueva. Pasa a "Cortada", y si era la primera de ese módulo/pedido/orden, todos suben de "Pendiente" a "En producción" (o "En proceso" en la orden).
+  - **Amarillo** ("Pieza ya escaneada anteriormente"): la pieza ya estaba cortada; no cambia nada.
+- Si el código no corresponde a ninguna pieza (o pertenece a una orden eliminada), aparece un cartel de error en vez del resumen — la cámara sigue funcionando, no hay que reiniciar nada.
 - **Botón "Volver"** (esquina superior izquierda, siempre visible sobre la imagen de la cámara): vuelve a la Vista 1.
 
 ---
 
 ## Diseño visual
 
-Los colores de la app están tomados de la identidad de [Neostone](https://neostone.com.ar/): una base neutra de grises carbón/blanco con un rojo de acento (`#DE0A0A`) reservado para botones y elementos activos — los estados "terminado" (Finalizado/Cortada/Lista) usan un gris neutro con un ícono de check en vez del rojo, para que no se lean como una alerta.
+- **Tema claro** (fondo blanco, letra oscura). La paleta sale de la propuesta *"Propuesta Digitalizacion Fabrica Neostone.pdf"*: negro carbón `#1A1A1A` (botones, encabezados), bronce `#9C7A4C` (acento: estado "En producción/En proceso", línea de la mira, animación de carga), beige cálido `#F4F2EF` y tonos cercanos (filas alternadas, hover), grises cálidos para bordes y texto secundario.
+- **Estados**: *Pendiente* = etiqueta outline con fondo blanco; *En producción / En proceso* = bronce; *Finalizado / Cortada / Lista* = verde con ícono de check.
+- **Filas de tabla** alternan blanco y beige para dar contraste; el hover es un beige más oscuro.
+- **Tamaño de letra**: la base es 17,5 px (un poco más que el default de 16 px); todo Tailwind escala con eso.
+- **Carga**: tres puntos que crecen y se achican en sucesión (`LoadingDots`) — en la pantalla de carga de cada página (`app/loading.tsx`) y dentro de los botones mientras corre una acción.
+- **Tipografía**: Geist (variable `--font-geist-sans`).
 
-Los tokens de color están en [`app/globals.css`](app/globals.css) (variables `--primary`, `--background`, etc., en formato `oklch`), y valen tanto para modo claro como oscuro.
+Los tokens de color están en [`app/globals.css`](app/globals.css) (variables `--primary`, `--background`, `--gold`, etc.). El bloque `.dark` sigue definido pero la app no lo usa.
 
 ---
 
@@ -198,3 +234,5 @@ Los tokens de color están en [`app/globals.css`](app/globals.css) (variables `-
 | La cámara se activa un segundo y se corta | Es un efecto de "Strict Mode" de React en modo desarrollo (monta y desmonta el componente dos veces para detectar fugas) — ya está resuelto en el código actual con un pequeño retraso al pedir la cámara, pero si volvés a ver esto después de tocar `escaner-camara.tsx`, es la primera sospecha | Revisar `modules/pieza/components/escaner-camara.tsx` |
 | Agregar una orden o escanear una pieza no hace nada, sin error visible | La IP de la PC cambió y `next.config.ts` todavía tiene la vieja (bloqueo silencioso de seguridad de Next.js) | Actualizar `allowedDevOrigins` en `next.config.ts` con la IP actual y reiniciar `npm run dev` |
 | El certificado de HTTPS no es de confianza | Es autofirmado, a propósito (no hace falta pagar/gestionar un certificado público para una red interna) | Aceptar el aviso del navegador una vez por dispositivo |
+| Una tabla se corta a la derecha (scroll horizontal) en una pantalla angosta | Con la letra más grande, la tabla de piezas (9 columnas) necesita más de ~800 px | Es esperado en pantallas chicas; en desktop/tablet horizontal entra. Las páginas usan `max-w-6xl` |
+| Al apretar "Pendiente" aparece un aviso de error con un motivo | El módulo/pedido/orden tiene hijos que no están en Pendiente | Es la regla de la app: pasá primero los hijos a Pendiente |
