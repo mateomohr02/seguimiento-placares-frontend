@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Orden } from "../types/orden.types";
-import { ArchivarOrdenButton } from "./archivar-orden-button";
+import { OrdenAcciones } from "./orden-acciones";
 
 // Búsqueda en el cliente: el listado es chico (órdenes vigentes) y así filtra
 // al tipear, sin ir al backend. Busca por N° de orden (el corto y el de
@@ -93,7 +93,7 @@ export function OrdenesTable({ ordenes, archivadas }: { ordenes: Orden[]; archiv
                 <EstadoBadge estado={orden.estado} />
               </TableCell>
               <TableCell className="text-right">
-                <ArchivarOrdenButton ordenId={orden.id} archivada={archivadas} />
+                <OrdenAcciones orden={orden} archivada={archivadas} />
               </TableCell>
             </TableRow>
           ))}

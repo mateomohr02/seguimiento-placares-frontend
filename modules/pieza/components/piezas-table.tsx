@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Pieza } from "../types/pieza.types";
-import { ConfirmarPiezaButton } from "./confirmar-pieza-button";
+import { PiezaAcciones } from "./pieza-acciones";
 
 // Columnas filtrables (Código y la acción quedan fuera a propósito).
 const FILTERS = {
@@ -37,7 +37,7 @@ function passes(pieza: Pieza, selection: Selection, skip?: FilterKey) {
   });
 }
 
-export function PiezasTable({ piezas }: { piezas: Pieza[] }) {
+export function PiezasTable({ piezas, moduloId }: { piezas: Pieza[]; moduloId: string }) {
   const [selection, setSelection] = useState<Selection>({});
 
   const rows = useMemo(() => piezas.filter((p) => passes(p, selection)), [piezas, selection]);
@@ -119,7 +119,7 @@ export function PiezasTable({ piezas }: { piezas: Pieza[] }) {
                 <EstadoBadge estado={pieza.estado} />
               </TableCell>
               <TableCell className="text-right">
-                <ConfirmarPiezaButton piezaId={pieza.id} disabled={pieza.estado === "CORTADA"} />
+                <PiezaAcciones pieza={pieza} moduloId={moduloId} />
               </TableCell>
             </TableRow>
           ))}

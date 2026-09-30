@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Pedido } from "../types/pedido.types";
-import { MarcarPedidoFinalizadoButton } from "./marcar-pedido-finalizado-button";
+import { PedidoAcciones } from "./pedido-acciones";
 
 export function PedidosTable({ pedidos, ordenId }: { pedidos: Pedido[]; ordenId: string }) {
   if (pedidos.length === 0) {
@@ -45,11 +45,7 @@ export function PedidosTable({ pedidos, ordenId }: { pedidos: Pedido[]; ordenId:
               <EstadoBadge estado={pedido.estado} />
             </TableCell>
             <TableCell className="text-right">
-              <MarcarPedidoFinalizadoButton
-                pedidoId={pedido.id}
-                ordenId={ordenId}
-                disabled={pedido.estado === "FINALIZADO"}
-              />
+              <PedidoAcciones pedido={pedido} ordenId={ordenId} />
             </TableCell>
           </TableRow>
         ))}

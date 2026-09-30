@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Modulo } from "../types/modulo.types";
-import { MarcarModuloFinalizadoButton } from "./marcar-modulo-finalizado-button";
+import { ModuloAcciones } from "./modulo-acciones";
 
 export function ModulosTable({ modulos, pedidoId }: { modulos: Modulo[]; pedidoId: string }) {
   if (modulos.length === 0) {
@@ -45,11 +45,7 @@ export function ModulosTable({ modulos, pedidoId }: { modulos: Modulo[]; pedidoI
               <EstadoBadge estado={modulo.estado} />
             </TableCell>
             <TableCell className="text-right">
-              <MarcarModuloFinalizadoButton
-                moduloId={modulo.id}
-                pedidoId={pedidoId}
-                disabled={modulo.estado === "FINALIZADO"}
-              />
+              <ModuloAcciones modulo={modulo} pedidoId={pedidoId} />
             </TableCell>
           </TableRow>
         ))}
