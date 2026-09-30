@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { LoadingDots } from "@/components/loading-dots";
 import {
   Dialog,
   DialogContent,
@@ -79,7 +80,7 @@ export function AgregarOrdenDialog() {
 
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Sincronizando..." : "Agregar"}
+              {isSubmitting ? <LoadingDots /> : "Agregar"}
             </Button>
           </DialogFooter>
         </form>

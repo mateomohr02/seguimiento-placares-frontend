@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { LoadingDots } from "@/components/loading-dots";
 import { confirmarPiezaAction } from "../actions/confirmar-pieza.action";
 
 export function ConfirmarPiezaButton({ piezaId, disabled }: { piezaId: string; disabled?: boolean }) {
@@ -21,7 +22,7 @@ export function ConfirmarPiezaButton({ piezaId, disabled }: { piezaId: string; d
 
   return (
     <Button size="sm" variant="outline" disabled={disabled || isPending} onClick={onClick}>
-      {isPending ? "Guardando..." : "Marcar finalizado"}
+      {isPending ? <LoadingDots /> : "Finalizado"}
     </Button>
   );
 }

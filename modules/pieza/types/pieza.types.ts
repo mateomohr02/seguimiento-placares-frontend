@@ -14,6 +14,7 @@ export interface Pieza {
 }
 
 export interface EscaneoResumen {
+  yaEscaneada: boolean;
   pieza: {
     id: string;
     idUnico: number | null;

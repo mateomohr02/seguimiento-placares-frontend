@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { LoadingDots } from "@/components/loading-dots";
 import { marcarModuloFinalizadoAction } from "../actions/marcar-modulo-finalizado.action";
 
 export function MarcarModuloFinalizadoButton({
@@ -29,7 +30,7 @@ export function MarcarModuloFinalizadoButton({
 
   return (
     <Button size="sm" variant="outline" disabled={disabled || isPending} onClick={onClick}>
-      {isPending ? "Guardando..." : "Marcar finalizado"}
+      {isPending ? <LoadingDots /> : "Finalizado"}
     </Button>
   );
 }

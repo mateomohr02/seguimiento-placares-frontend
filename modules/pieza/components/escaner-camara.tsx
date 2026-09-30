@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { cn } from "cn";
 import { ArrowLeftIcon } from "lucide-react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType, NotFoundException } from "@zxing/library";
@@ -151,16 +152,40 @@ export function EscanerCamara() {
         </div>
       )}
 
+      {/* Mira: encuadre rectangular (los Code39 son anchos) con el resto de la
+          imagen atenuada, esquinas marcadas y una línea de barrido. Es solo
+          guía visual — el lector decodifica todo el cuadro. */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="relative h-[28%] w-[80%] max-w-2xl rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]">
+          <span className="absolute top-0 left-0 size-8 rounded-tl-2xl border-t-4 border-l-4 border-white" />
+          <span className="absolute top-0 right-0 size-8 rounded-tr-2xl border-t-4 border-r-4 border-white" />
+          <span className="absolute bottom-0 left-0 size-8 rounded-bl-2xl border-b-4 border-l-4 border-white" />
+          <span className="absolute right-0 bottom-0 size-8 rounded-br-2xl border-r-4 border-b-4 border-white" />
+          <span
+            className="absolute inset-x-3 h-0.5 rounded-full bg-gold shadow-[0_0_8px_var(--gold)]"
+            style={{ animation: "scan-line 2.4s ease-in-out infinite" }}
+          />
+        </div>
+      </div>
+
       {resumen && (
-        <div className="absolute inset-x-0 bottom-0 m-4 rounded-xl bg-popover/95 p-4 text-popover-foreground shadow-lg backdrop-blur">
-          <p className="text-xs text-muted-foreground">
+        <div
+          className={cn(
+            "absolute inset-x-0 bottom-0 m-4 rounded-xl p-4 shadow-lg",
+            resumen.yaEscaneada ? "bg-yellow-300 text-yellow-950" : "bg-green-600 text-white",
+          )}
+        >
+          <p className="text-sm font-semibold">
+            {resumen.yaEscaneada ? "Pieza ya escaneada anteriormente" : "Pieza registrada"}
+          </p>
+          <p className="text-sm opacity-80">
             Orden {resumen.orden.numeroOrdenCustom} · Pedido {resumen.pedido.codigo_pedido}
           </p>
-          <p className="font-medium">
+          <p className="text-lg font-semibold">
             {resumen.pieza.descripcion ?? `${resumen.pieza.familia} / ${resumen.pieza.articulo}`} para el
-            módulo {resumen.modulo.descripcion}
+            módulo {resumen.modulo.descripcion} ({resumen.modulo.idEscena})
           </p>
-          <p className="text-sm">
+          <p className="text-base">
             {resumen.pieza.medida1} × {resumen.pieza.medida2} · {resumen.pieza.color} · idUnico{" "}
             {resumen.pieza.idUnico}
           </p>

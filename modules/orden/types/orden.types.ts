@@ -7,5 +7,6 @@ export interface Orden {
   descripcion: string;
   estado: OrdenEstado;
   creado_en: string;
+  archivada_en: string | null;
   pedidosCount: number;
 }
