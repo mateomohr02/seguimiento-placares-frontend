@@ -18,7 +18,8 @@ import { OrdenAcciones } from "./orden-acciones";
 
 // Búsqueda en el cliente: el listado es chico (órdenes vigentes) y así filtra
 // al tipear, sin ir al backend. Busca por N° de orden (el corto y el de
-// fabricación) y por descripción, sin distinguir mayúsculas ni acentos.
+// fabricación), por número de pedido y por descripción, sin distinguir
+// mayúsculas ni acentos.
 const normalize = (s: string) =>
   s
     .normalize("NFD")
@@ -31,10 +32,18 @@ export function OrdenesTable({ ordenes, archivadas }: { ordenes: Orden[]; archiv
   const filtradas = useMemo(() => {
     const q = normalize(query.trim());
     if (!q) return ordenes;
-    return ordenes.filter((o) =>
-      normalize(`${o.numeroOrdenCustom} ${o.codigoOrdenFabricacion} ${o.descripcion}`).includes(q),
+    return ordenes.filter(
+      (o) =>
+        normalize(`${o.numeroOrdenCustom} ${o.codigoOrdenFabricacion} ${o.descripcion}`).includes(q) ||
+        o.codigosPedido.some((c) => normalize(c).includes(q)),
     );
   }, [ordenes, query]);
+
+  // Pedidos que coinciden con la búsqueda (para mostrar por qué apareció la orden).
+  const pedidosCoincidentes = (orden: Orden) => {
+    const q = normalize(query.trim());
+    return q ? orden.codigosPedido.filter((c) => normalize(c).includes(q)) : [];
+  };
 
   if (ordenes.length === 0) {
     return (
@@ -52,9 +61,14 @@ export function OrdenesTable({ ordenes, archivadas }: { ordenes: Orden[]; archiv
         <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
-          placeholder="Buscar por N° de orden o descripción..."
+          placeholder="Buscar por N° de orden, pedido o descripción..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          enterKeyHint="search"
+          onKeyDown={(e) => {
+            // En tablet, Enter no cierra el teclado solo (no hay <form>): se quita el foco.
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
           className="pl-8"
         />
       </div>
@@ -87,6 +101,13 @@ export function OrdenesTable({ ordenes, archivadas }: { ordenes: Orden[]; archiv
                 <Link href={`/ordenes/${orden.id}`} className="hover:underline">
                   {orden.descripcion}
                 </Link>
+                {pedidosCoincidentes(orden).length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Pedido {pedidosCoincidentes(orden).slice(0, 3).join(", ")}
+                    {pedidosCoincidentes(orden).length > 3 &&
+                      ` y ${pedidosCoincidentes(orden).length - 3} más`}
+                  </p>
+                )}
               </TableCell>
               <TableCell>{orden.pedidosCount}</TableCell>
               <TableCell>

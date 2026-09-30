@@ -9,9 +9,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Pedido } from "../types/pedido.types";
-import { PedidoAcciones } from "./pedido-acciones";
 
-export function PedidosTable({ pedidos, ordenId }: { pedidos: Pedido[]; ordenId: string }) {
+export function PedidosTable({ pedidos }: { pedidos: Pedido[] }) {
   if (pedidos.length === 0) {
     return <p className="text-sm text-muted-foreground">Esta orden no tiene pedidos sincronizados.</p>;
   }
@@ -24,7 +23,6 @@ export function PedidosTable({ pedidos, ordenId }: { pedidos: Pedido[]; ordenId:
           <TableHead>Cliente</TableHead>
           <TableHead>Módulos</TableHead>
           <TableHead>Estado</TableHead>
-          <TableHead />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -43,9 +41,6 @@ export function PedidosTable({ pedidos, ordenId }: { pedidos: Pedido[]; ordenId:
             <TableCell>{pedido.modulosCount}</TableCell>
             <TableCell>
               <EstadoBadge estado={pedido.estado} />
-            </TableCell>
-            <TableCell className="text-right">
-              <PedidoAcciones pedido={pedido} ordenId={ordenId} />
             </TableCell>
           </TableRow>
         ))}

@@ -30,7 +30,7 @@ export default async function ModuloDetallePage({
         </div>
       </div>
 
-      <PiezasTable piezas={piezas} moduloId={id} />
+      <PiezasTable piezas={piezas} />
     </main>
   );
 }

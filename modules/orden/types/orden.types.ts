@@ -9,4 +9,5 @@ export interface Orden {
   creado_en: string;
   archivada_en: string | null;
   pedidosCount: number;
+  codigosPedido: string[];
 }

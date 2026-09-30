@@ -16,7 +16,9 @@ export async function archivarOrdenAction(
     const orden = await apiFetch<Orden>(`/ordenes/${ordenId}/${archivar ? "archivar" : "desarchivar"}`, {
       method: "PATCH",
     });
-    revalidatePath("/");
+    // Los estados se propagan entre niveles (pieza/módulo/pedido/orden): se invalida todo
+    // para que ninguna vista (incluida la de arriba, al volver) muestre estados viejos.
+    revalidatePath("/", "layout");
     return { success: true, orden };
   } catch (err) {
     const message = err instanceof ApiError ? err.message : "Error inesperado al archivar la orden.";

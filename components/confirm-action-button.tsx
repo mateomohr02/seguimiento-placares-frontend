@@ -31,6 +31,7 @@ export function ConfirmActionButton({
   requireText,
   variant = "outline",
   disabled,
+  ariaLabel,
 }: {
   label: ReactNode;
   title: string;
@@ -42,6 +43,8 @@ export function ConfirmActionButton({
   requireText?: string;
   variant?: "outline" | "destructive" | "default";
   disabled?: boolean;
+  /** Para botones que son solo un ícono. */
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
@@ -73,7 +76,7 @@ export function ConfirmActionButton({
     >
       <DialogTrigger
         render={
-          <Button size="sm" variant={variant} disabled={disabled}>
+          <Button size="sm" variant={variant} disabled={disabled} aria-label={ariaLabel} title={ariaLabel}>
             {label}
           </Button>
         }

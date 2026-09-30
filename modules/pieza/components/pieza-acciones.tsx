@@ -5,7 +5,7 @@ import { confirmarPiezaAction } from "../actions/confirmar-pieza.action";
 import { marcarPiezaPendienteAction } from "../actions/marcar-pieza-pendiente.action";
 import type { Pieza } from "../types/pieza.types";
 
-export function PiezaAcciones({ pieza, moduloId }: { pieza: Pieza; moduloId: string }) {
+export function PiezaAcciones({ pieza }: { pieza: Pieza }) {
   const nombre = `${pieza.descripcion ?? `${pieza.familia} / ${pieza.articulo}`} (${pieza.idUnico ?? "sin código"})`;
 
   return (
@@ -29,7 +29,7 @@ export function PiezaAcciones({ pieza, moduloId }: { pieza: Pieza; moduloId: str
         successMessage="Pieza vuelta a Pendiente."
         errorTitle="No se pudo pasar la pieza a Pendiente"
         disabled={pieza.estado !== "CORTADA"}
-        run={() => marcarPiezaPendienteAction(pieza.id, moduloId)}
+        run={() => marcarPiezaPendienteAction(pieza.id)}
       />
     </div>
   );

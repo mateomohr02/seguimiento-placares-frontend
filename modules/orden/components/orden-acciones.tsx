@@ -3,7 +3,7 @@
 import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from "lucide-react";
 import { ConfirmActionButton } from "@/components/confirm-action-button";
 import { archivarOrdenAction } from "../actions/archivar-orden.action";
-import { eliminarOrdenAction, marcarOrdenPendienteAction } from "../actions/orden-estado.action";
+import { eliminarOrdenAction } from "../actions/orden-estado.action";
 import type { Orden } from "../types/orden.types";
 
 export function OrdenAcciones({ orden, archivada }: { orden: Orden; archivada: boolean }) {
@@ -11,19 +11,6 @@ export function OrdenAcciones({ orden, archivada }: { orden: Orden; archivada: b
 
   return (
     <div className="flex justify-end gap-2">
-      <ConfirmActionButton
-        label="Pendiente"
-        title="¿Volver la orden a Pendiente?"
-        description={
-          <>
-            Orden {nombre}. Solo es posible si todos sus pedidos están en Pendiente.
-          </>
-        }
-        successMessage={`Orden ${orden.numeroOrdenCustom} vuelta a Pendiente.`}
-        errorTitle="No se pudo pasar la orden a Pendiente"
-        disabled={orden.estado === "PENDIENTE"}
-        run={() => marcarOrdenPendienteAction(orden.id)}
-      />
       <ConfirmActionButton
         label={
           archivada ? (
@@ -53,11 +40,8 @@ export function OrdenAcciones({ orden, archivada }: { orden: Orden; archivada: b
       />
       <ConfirmActionButton
         variant="destructive"
-        label={
-          <>
-            <Trash2Icon /> Eliminar
-          </>
-        }
+        ariaLabel="Eliminar orden"
+        label={<Trash2Icon />}
         title="¿Eliminar la orden?"
         description={
           <>

@@ -9,9 +9,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Modulo } from "../types/modulo.types";
-import { ModuloAcciones } from "./modulo-acciones";
 
-export function ModulosTable({ modulos, pedidoId }: { modulos: Modulo[]; pedidoId: string }) {
+export function ModulosTable({ modulos }: { modulos: Modulo[] }) {
   if (modulos.length === 0) {
     return <p className="text-sm text-muted-foreground">Este pedido no tiene módulos sincronizados.</p>;
   }
@@ -24,7 +23,6 @@ export function ModulosTable({ modulos, pedidoId }: { modulos: Modulo[]; pedidoI
           <TableHead>Descripción</TableHead>
           <TableHead>Piezas</TableHead>
           <TableHead>Estado</TableHead>
-          <TableHead />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -43,9 +41,6 @@ export function ModulosTable({ modulos, pedidoId }: { modulos: Modulo[]; pedidoI
             <TableCell>{modulo.despieceTiposCount}</TableCell>
             <TableCell>
               <EstadoBadge estado={modulo.estado} />
-            </TableCell>
-            <TableCell className="text-right">
-              <ModuloAcciones modulo={modulo} pedidoId={pedidoId} />
             </TableCell>
           </TableRow>
         ))}

@@ -37,7 +37,7 @@ function passes(pieza: Pieza, selection: Selection, skip?: FilterKey) {
   });
 }
 
-export function PiezasTable({ piezas, moduloId }: { piezas: Pieza[]; moduloId: string }) {
+export function PiezasTable({ piezas }: { piezas: Pieza[] }) {
   const [selection, setSelection] = useState<Selection>({});
 
   const rows = useMemo(() => piezas.filter((p) => passes(p, selection)), [piezas, selection]);
@@ -119,7 +119,7 @@ export function PiezasTable({ piezas, moduloId }: { piezas: Pieza[]; moduloId: s
                 <EstadoBadge estado={pieza.estado} />
               </TableCell>
               <TableCell className="text-right">
-                <PiezaAcciones pieza={pieza} moduloId={moduloId} />
+                <PiezaAcciones pieza={pieza} />
               </TableCell>
             </TableRow>
           ))}

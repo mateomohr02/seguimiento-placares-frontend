@@ -70,6 +70,11 @@ export function ColumnFilter({
               placeholder={`Buscar en ${label.toLowerCase()}...`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              enterKeyHint="search"
+              onKeyDown={(e) => {
+                // En tablet, Enter no cierra el teclado solo (no hay <form>): se quita el foco.
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
               className="mb-2 h-8"
             />
             <div className="max-h-56 overflow-y-auto">

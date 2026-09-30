@@ -30,7 +30,7 @@ export default async function PedidoDetallePage({
         </div>
       </div>
 
-      <ModulosTable modulos={modulos} pedidoId={pedido.id} />
+      <ModulosTable modulos={modulos} />
     </main>
   );
 }

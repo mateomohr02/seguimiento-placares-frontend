@@ -15,7 +15,9 @@ export async function confirmarPiezaAction(piezaId: string): Promise<ConfirmarPi
     const resumen = await apiFetch<EscaneoResumen>(`/piezas/${piezaId}/confirmar`, {
       method: "PATCH",
     });
-    revalidatePath(`/modulos/${resumen.modulo.id}`);
+    // Los estados se propagan entre niveles (pieza/módulo/pedido/orden): se invalida todo
+    // para que ninguna vista (incluida la de arriba, al volver) muestre estados viejos.
+    revalidatePath("/", "layout");
     return { success: true, resumen };
   } catch (err) {
     const message = err instanceof ApiError ? err.message : "Error inesperado al confirmar la pieza.";

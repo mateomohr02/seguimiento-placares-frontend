@@ -30,7 +30,7 @@ export default async function OrdenDetallePage({
         </div>
       </div>
 
-      <PedidosTable pedidos={pedidos} ordenId={orden.id} />
+      <PedidosTable pedidos={pedidos} />
     </main>
   );
 }

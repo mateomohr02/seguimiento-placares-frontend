@@ -20,7 +20,9 @@ export async function createOrdenAction(input: unknown): Promise<CreateOrdenActi
       method: "POST",
       body: parsed.data,
     });
-    revalidatePath("/");
+    // Los estados se propagan entre niveles (pieza/módulo/pedido/orden): se invalida todo
+    // para que ninguna vista (incluida la de arriba, al volver) muestre estados viejos.
+    revalidatePath("/", "layout");
     return { success: true, orden };
   } catch (err) {
     const message = err instanceof ApiError ? err.message : "Error inesperado al agregar la orden.";
