@@ -1,18 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, MinusIcon, PlusIcon, ScanIcon } from "lucide-react";
+import { ArrowLeftIcon, MinusIcon, PencilIcon, PlusIcon, ScanIcon } from "lucide-react";
 import type { PDFDocumentProxy, PDFDocumentLoadingTask } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { LoadingDots } from "@/components/loading-dots";
 import { loadPdfjs } from "@/lib/pdfjs";
+import type { AnotacionNota, AnotacionPagina, Herramienta, NuevaAnotacion } from "../types/anotacion.types";
+import { CapaAnotaciones } from "./anotaciones-capa";
+import { BarraAnotaciones, paletaDe } from "./barra-anotaciones";
+import { NotasDocumento } from "./notas-documento";
+import { useAnotaciones } from "../hooks/use-anotaciones";
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.25;
 // Tope de lado del canvas: las tablets viejas fallan (canvas en blanco) por encima.
 const MAX_CANVAS_SIDE = 4096;
+const REFRESCO_ANOTACIONES_MS = 20000;
+const SIN_ANOTACIONES: AnotacionPagina[] = [];
 
 // Una página: se dibuja solo mientras está cerca de la pantalla y libera el
 // canvas al alejarse (una orden puede tener 80+ hojas y la tablet no las
@@ -23,12 +30,24 @@ function Pagina({
   cssWidth,
   aspect,
   scrollRoot,
+  anotaciones,
+  herramienta,
+  color,
+  nivel,
+  onCrear,
+  onBorrar,
 }: {
   pdf: PDFDocumentProxy;
   numero: number;
   cssWidth: number;
   aspect: number;
   scrollRoot: HTMLElement | null;
+  anotaciones: AnotacionPagina[];
+  herramienta: Herramienta;
+  color: string;
+  nivel: number;
+  onCrear: (a: NuevaAnotacion) => void;
+  onBorrar: (id: string) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -89,15 +108,30 @@ function Pagina({
       style={{ width: cssWidth, height: cssWidth * aspect }}
     >
       <canvas ref={canvasRef} className="block size-full" />
+      {cssWidth > 0 && (
+        <CapaAnotaciones
+          pagina={numero}
+          cssWidth={cssWidth}
+          cssHeight={cssWidth * aspect}
+          anotaciones={anotaciones}
+          herramienta={herramienta}
+          color={color}
+          nivel={nivel}
+          onCrear={onCrear}
+          onBorrar={onBorrar}
+        />
+      )}
     </div>
   );
 }
 
 export function HojaCorteVisor({
+  hojaId,
   src,
   titulo,
   volverHref,
 }: {
+  hojaId: string;
   src: string;
   titulo: string;
   volverHref: string;
@@ -116,6 +150,35 @@ export function HojaCorteVisor({
   }, []);
   const zoomAnterior = useRef(1);
   const rafRef = useRef(0);
+
+  // Anotaciones (dibujo / texto / notas del documento).
+  const { anotaciones, crear, borrar, deshacer, puedeDeshacer } = useAnotaciones(hojaId, REFRESCO_ANOTACIONES_MS);
+  const [edicion, setEdicion] = useState(false);
+  const [herramienta, setHerramienta] = useState<Herramienta>("mover");
+  const [color, setColor] = useState(paletaDe("lapiz")[0]);
+  const [nivel, setNivel] = useState(1);
+  const porPagina = useMemo(() => {
+    const m = new Map<number, AnotacionPagina[]>();
+    for (const a of anotaciones) {
+      if (a.pagina === null) continue;
+      const l = m.get(a.pagina) ?? [];
+      l.push(a as AnotacionPagina);
+      m.set(a.pagina, l);
+    }
+    return m;
+  }, [anotaciones]);
+  const notas = useMemo(() => anotaciones.filter((a): a is AnotacionNota => a.pagina === null), [anotaciones]);
+
+  function elegirHerramienta(h: Herramienta) {
+    setHerramienta(h);
+    const paleta = paletaDe(h);
+    if (!paleta.includes(color)) setColor(paleta[0]);
+  }
+
+  function alternarEdicion() {
+    setEdicion((e) => !e);
+    setHerramienta("mover");
+  }
 
   // Carga del documento.
   useEffect(() => {
@@ -270,7 +333,30 @@ export function HojaCorteVisor({
             <ScanIcon />
           </Button>
         </div>
+
+        <Button className="h-11 px-4" variant={edicion ? "default" : "outline"} aria-pressed={edicion} onClick={alternarEdicion}>
+          <PencilIcon /> {edicion ? "Listo" : "Anotar"}
+        </Button>
       </header>
+
+      {edicion && (
+        <BarraAnotaciones
+          herramienta={herramienta}
+          onHerramienta={elegirHerramienta}
+          color={color}
+          onColor={setColor}
+          nivel={nivel}
+          onNivel={setNivel}
+          puedeDeshacer={puedeDeshacer}
+          onDeshacer={deshacer}
+        />
+      )}
+      <NotasDocumento
+        notas={notas}
+        edicion={edicion}
+        onCrear={(texto) => void crear({ tipo: "TEXTO", pagina: null, datos: { texto } })}
+        onBorrar={(id) => void borrar(id)}
+      />
 
       <div ref={asignarScrollRoot} onScroll={onScroll} className="flex-1 overflow-auto p-3">
         {error ? (
@@ -284,7 +370,20 @@ export function HojaCorteVisor({
         ) : (
           <div className="flex w-max min-w-full flex-col gap-3">
             {Array.from({ length: pdf.numPages }, (_, i) => (
-              <Pagina key={i + 1} pdf={pdf} numero={i + 1} cssWidth={cssWidth} aspect={aspect} scrollRoot={scrollRoot} />
+              <Pagina
+                key={i + 1}
+                pdf={pdf}
+                numero={i + 1}
+                cssWidth={cssWidth}
+                aspect={aspect}
+                scrollRoot={scrollRoot}
+                anotaciones={porPagina.get(i + 1) ?? SIN_ANOTACIONES}
+                herramienta={edicion ? herramienta : "mover"}
+                color={color}
+                nivel={nivel}
+                onCrear={(a) => void crear(a)}
+                onBorrar={(id) => void borrar(id)}
+              />
             ))}
           </div>
         )}
