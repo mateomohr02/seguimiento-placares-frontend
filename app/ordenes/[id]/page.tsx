@@ -4,6 +4,8 @@ import { PedidosTable } from "@/modules/pedido/components/pedidos-table";
 import type { Pedido } from "@/modules/pedido/types/pedido.types";
 import type { Orden } from "@/modules/orden/types/orden.types";
 import { EstadoBadge } from "@/components/estado-badge";
+import { buttonVariants } from "@/components/ui/button";
+import { FileTextIcon } from "lucide-react";
 
 export default async function OrdenDetallePage({
   params,
@@ -27,6 +29,12 @@ export default async function OrdenDetallePage({
             Orden {orden.numeroOrdenCustom} — {orden.descripcion}
           </h1>
           <EstadoBadge estado={orden.estado} />
+          <Link
+            href={`/ordenes/${id}/hojas-corte`}
+            className={buttonVariants({ variant: "outline", className: "ml-auto h-10 px-4" })}
+          >
+            <FileTextIcon /> Hojas de corte
+          </Link>
         </div>
       </div>
 
