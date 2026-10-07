@@ -5,6 +5,8 @@ import type { Modulo } from "@/modules/modulo/types/modulo.types";
 import type { PedidoConOrden } from "@/modules/pedido/types/pedido.types";
 import { EstadoBadge } from "@/components/estado-badge";
 import { DocumentacionPedido } from "@/modules/documento-pedido/components/documentacion-pedido";
+import { PlanosPedido } from "@/modules/plano-pedido/components/planos-pedido";
+import type { PlanoPedido } from "@/modules/plano-pedido/types/plano-pedido.types";
 import type { DocumentoPedido } from "@/modules/documento-pedido/types/documento-pedido.types";
 
 export default async function PedidoDetallePage({
@@ -13,10 +15,11 @@ export default async function PedidoDetallePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [pedido, modulos, documentos] = await Promise.all([
+  const [pedido, modulos, documentos, planos] = await Promise.all([
     apiFetch<PedidoConOrden>(`/pedidos/${id}`),
     apiFetch<Modulo[]>(`/pedidos/${id}/modulos`),
     apiFetch<DocumentoPedido[]>(`/pedidos/${id}/documentos`),
+    apiFetch<PlanoPedido[]>(`/pedidos/${id}/planos`),
   ]);
 
   return (
@@ -36,6 +39,8 @@ export default async function PedidoDetallePage({
       <ModulosTable modulos={modulos} />
 
       <DocumentacionPedido pedidoId={id} codigoPedido={pedido.codigo_pedido} documentos={documentos} />
+
+      <PlanosPedido pedidoId={id} planos={planos} modulos={modulos} />
     </main>
   );
 }
