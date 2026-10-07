@@ -19,7 +19,7 @@ export function PlanosPedido({
   modulos: { id: string; idEscena: number; descripcion: string }[];
 }) {
   return (
-    <section className="flex flex-col gap-4">
+    <section id="planos" className="flex scroll-mt-20 flex-col gap-4">
       <h2 className="text-lg font-semibold">Planos</h2>
       <div className="flex flex-col gap-3 rounded-lg border p-4">
         {planos.length === 0 ? (

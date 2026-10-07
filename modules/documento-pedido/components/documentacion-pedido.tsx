@@ -49,7 +49,7 @@ export function DocumentacionPedido({
   const adicionales = documentos.filter((d) => TIPOS_ADICIONALES.includes(d.tipo));
 
   return (
-    <section className="flex flex-col gap-4">
+    <section id="documentacion" className="flex scroll-mt-20 flex-col gap-4">
       <h2 className="text-lg font-semibold">Documentación</h2>
 
       <div className="grid gap-4 md:grid-cols-2">

@@ -4,6 +4,8 @@ import { ModulosTable } from "@/modules/modulo/components/modulos-table";
 import type { Modulo } from "@/modules/modulo/types/modulo.types";
 import type { PedidoConOrden } from "@/modules/pedido/types/pedido.types";
 import { EstadoBadge } from "@/components/estado-badge";
+import { PedidoNav } from "@/modules/pedido/components/pedido-nav";
+import { TIPOS_OBLIGATORIOS } from "@/modules/documento-pedido/types/documento-pedido.types";
 import { DocumentacionPedido } from "@/modules/documento-pedido/components/documentacion-pedido";
 import { PlanosPedido } from "@/modules/plano-pedido/components/planos-pedido";
 import type { PlanoPedido } from "@/modules/plano-pedido/types/plano-pedido.types";
@@ -36,7 +38,23 @@ export default async function PedidoDetallePage({
         </div>
       </div>
 
-      <ModulosTable modulos={modulos} />
+      <PedidoNav
+        items={[
+          { id: "modulacion", label: "Modulación", count: modulos.length },
+          {
+            id: "documentacion",
+            label: "Documentación",
+            count: documentos.length,
+            alerta: TIPOS_OBLIGATORIOS.some((t) => !documentos.some((d) => d.tipo === t)),
+          },
+          { id: "planos", label: "Planos", count: planos.length },
+        ]}
+      />
+
+      <section id="modulacion" className="flex scroll-mt-20 flex-col gap-4">
+        <h2 className="text-lg font-semibold">Modulación</h2>
+        <ModulosTable modulos={modulos} />
+      </section>
 
       <DocumentacionPedido pedidoId={id} codigoPedido={pedido.codigo_pedido} documentos={documentos} />
 
