@@ -19,7 +19,7 @@ export default async function HojaCorteVisorPage({
 
   return (
     <HojaCorteVisor
-      hojaId={hoja.id}
+      anotacionesUrl={`/hojas-corte/${hoja.id}/anotaciones`}
       src={`/hojas-corte/${hoja.id}/archivo`}
       titulo={`Orden ${orden.numeroOrdenCustom} — ${hoja.nombre}`}
       volverHref={`/ordenes/${id}/hojas-corte`}

@@ -14,8 +14,7 @@ const esTemporal = (id: string) => id.startsWith("tmp-");
 // Estado de las anotaciones de una hoja: carga, refresco periódico (para ver lo
 // que anotan otros dispositivos), y alta/baja optimistas con reversión si el
 // servidor falla. "Deshacer" borra lo último que creó ESTE dispositivo.
-export function useAnotaciones(hojaId: string, refrescoMs: number) {
-  const base = `/hojas-corte/${hojaId}/anotaciones`;
+export function useAnotaciones(base: string, refrescoMs: number) {
   const [anotaciones, setAnotaciones] = useState<Anotacion[]>([]);
   const [undo, setUndo] = useState<string[]>([]);
   const borrando = useRef(new Set<string>());

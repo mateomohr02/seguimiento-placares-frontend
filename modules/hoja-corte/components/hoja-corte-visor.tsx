@@ -126,12 +126,13 @@ function Pagina({
 }
 
 export function HojaCorteVisor({
-  hojaId,
+  anotacionesUrl,
   src,
   titulo,
   volverHref,
 }: {
-  hojaId: string;
+  /** Base de la API de anotaciones del documento (ej. /hojas-corte/<id>/anotaciones). */
+  anotacionesUrl: string;
   src: string;
   titulo: string;
   volverHref: string;
@@ -152,7 +153,7 @@ export function HojaCorteVisor({
   const rafRef = useRef(0);
 
   // Anotaciones (dibujo / texto / notas del documento).
-  const { anotaciones, crear, borrar, deshacer, puedeDeshacer } = useAnotaciones(hojaId, REFRESCO_ANOTACIONES_MS);
+  const { anotaciones, crear, borrar, deshacer, puedeDeshacer } = useAnotaciones(anotacionesUrl, REFRESCO_ANOTACIONES_MS);
   const [edicion, setEdicion] = useState(false);
   const [herramienta, setHerramienta] = useState<Herramienta>("mover");
   const [color, setColor] = useState(paletaDe("lapiz")[0]);
