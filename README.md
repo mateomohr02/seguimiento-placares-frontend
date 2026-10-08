@@ -238,7 +238,7 @@ Entrá por `https://192.168.3.NNN/`. Como el certificado es autofirmado y ahora 
 
 ### Ingreso con PIN y roles
 
-Al abrir la app aparece la pantalla de **PIN** (teclado numérico en pantalla; con teclado físico también sirve, con Enter para ingresar). El PIN identifica al usuario: una persona o una estación de trabajo (`rover1`, `cortadora1`, …). Con un PIN incorrecto avisa y limpia el campo; tras 8 errores seguidos se bloquea unos minutos.
+Al abrir la app aparece la pantalla de **PIN** (teclado numérico en pantalla; **con la tablet apaisada** —pantalla horizontal de hasta 800 px de alto— se parte en dos columnas, logo/título/puntos del PIN a un lado y el teclado al otro, para no tener que scrollear; en vertical queda en una columna; con teclado físico también sirve, con Enter para ingresar). El PIN identifica al usuario: una persona o una estación de trabajo (`rover1`, `cortadora1`, …). Con un PIN incorrecto avisa y limpia el campo; tras 8 errores seguidos se bloquea unos minutos.
 
 - La sesión dura **12 horas** (configurable en el backend) y se guarda en una cookie que el navegador no puede leer. Arriba a la derecha del listado de órdenes se ve **quién está conectado y su rol**, con el botón **Salir**. Si la sesión vence, o si dan de baja al usuario mientras la usa, la app lo manda otra vez al ingreso de PIN.
 - Los usuarios, roles y permisos **se administran en la base** (ver el [README del backend](../backend/README.md#9-usuarios-roles-y-permisos)); no hay pantalla de administración.
