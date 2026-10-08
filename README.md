@@ -103,7 +103,7 @@ Copiá `.env.example` a `.env.local` y completá:
 |---|---|---|
 | `API_URL` | Dónde está el backend | `http://localhost:4000/api` |
 
-El login (PIN) no necesita variables acá: las claves (`PIN_PEPPER`, `SESSION_SECRET`) viven solo en el `.env` del backend. `API_URL` **no** lleva el prefijo `NEXT_PUBLIC_` a propósito: solo se usa del lado del servidor (páginas y Server Actions), nunca desde el navegador — así el backend no queda expuesto directamente a quien abra las herramientas de desarrollador del navegador.
+El login (PIN) no necesita variables acá: la clave de sesión (`SESSION_SECRET`) vive solo en el `.env` del backend. `API_URL` **no** lleva el prefijo `NEXT_PUBLIC_` a propósito: solo se usa del lado del servidor (páginas y Server Actions), nunca desde el navegador — así el backend no queda expuesto directamente a quien abra las herramientas de desarrollador del navegador.
 
 ---
 
@@ -393,7 +393,7 @@ Los tokens de color están en [`app/globals.css`](app/globals.css) (variables `-
 | El visor muestra solo tres puntos y no abre la hoja | El PDF no llegó o el navegador es muy viejo para pdf.js | Recargar; si el aviso dice "No se pudo abrir la hoja de corte", revisar que el backend esté corriendo. En desarrollo (`npm run dev`), la **primera** carga del visor tarda porque compila pdf.js; en producción abre en menos de un segundo |
 | Subir un PDF falla con "Este PDF es del pedido X…" / "parece ser …" | Se está cargando en el pedido o tipo equivocado (es la verificación funcionando) | Subirlo donde corresponde, o elegir el tipo correcto |
 | La app siempre vuelve a la pantalla de PIN | La sesión venció (12 h), el usuario fue dado de baja, se cambió `SESSION_SECRET` en el backend, o el navegador bloquea cookies | Volver a ingresar el PIN; si se repite, verificar que el usuario esté `activo` en la base y que el backend esté corriendo |
-| "PIN incorrecto" con un PIN que debería andar | El `pin_hash` se generó con otro `PIN_PEPPER` o hay otro backend con distinta configuración | Regenerar el hash con `npm run usuario:sql` en el backend actual (ver su README) |
+| "PIN incorrecto" con un PIN que debería andar | El usuario no existe, está `activo = false`, o el PIN cargado en la tabla `usuario` es otro | Revisar la fila del usuario en la base (ver el README del backend) |
 | Un botón no aparece o la app responde "No tenés permiso" | El rol del usuario no incluye ese permiso (es lo esperado) | Revisar la tabla de roles de [Ingreso con PIN y roles](#ingreso-con-pin-y-roles); los permisos se editan en la tabla `rol_permiso` del backend |
 | Una anotación hecha en otra tablet no aparece | El visor se refresca cada 20 segundos | Esperar unos segundos o recargar la página |
 | Una tabla se corta a la derecha (scroll horizontal) en una pantalla angosta | Con la letra más grande, la tabla de piezas (9 columnas) necesita más de ~800 px | Es esperado en pantallas chicas; en desktop/tablet horizontal entra. Las páginas usan `max-w-6xl` |
