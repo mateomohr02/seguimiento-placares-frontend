@@ -57,44 +57,48 @@ export function LoginForm() {
   }, [agregar, ingresar, pendiente, pin]);
 
   return (
-    <div className="flex w-full max-w-xs flex-col items-center gap-6">
-      <div className="flex flex-col items-center gap-3 text-center">
-        <LogoNeostone className="w-52" />
-        <h1 className="text-xl font-semibold">Seguimiento Productivo</h1>
-        <p className="text-sm text-muted-foreground">Ingresá tu PIN</p>
+    <div className="flex w-full max-w-xs flex-col items-center gap-6 apaisado:max-w-2xl apaisado:flex-row apaisado:gap-12">
+      {/* Columna izquierda (en apaisado): marca, título, puntos del PIN y errores. */}
+      <div className="flex w-full flex-col items-center gap-6 apaisado:flex-1">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <LogoNeostone className="w-52 apaisado:w-44" />
+          <h1 className="text-xl font-semibold">Seguimiento Productivo</h1>
+          <p className="text-sm text-muted-foreground">Ingresá tu PIN</p>
+        </div>
+
+        <div className="flex h-6 items-center gap-3" aria-label={`${pin.length} dígitos ingresados`} role="status">
+          {pin.length === 0 ? (
+            <span className="text-muted-foreground">——</span>
+          ) : (
+            Array.from(pin).map((_, i) => <span key={i} className="size-4 rounded-full bg-primary" />)
+          )}
+        </div>
+
+        <p role="alert" className="min-h-5 text-center text-sm text-destructive">
+          {error}
+        </p>
       </div>
 
-      <div className="flex h-6 items-center gap-3" aria-label={`${pin.length} dígitos ingresados`} role="status">
-        {pin.length === 0 ? (
-          <span className="text-muted-foreground">——</span>
-        ) : (
-          Array.from(pin).map((_, i) => <span key={i} className="size-4 rounded-full bg-primary" />)
-        )}
-      </div>
-
-      <p role="alert" className="min-h-5 text-center text-sm text-destructive">
-        {error}
-      </p>
-
-      <div className="grid w-full grid-cols-3 gap-3">
+      {/* Columna derecha (en apaisado): teclado. */}
+      <div className="grid w-full grid-cols-3 gap-3 apaisado:max-w-xs apaisado:flex-1">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
-          <Button key={d} variant="outline" className="h-16 text-2xl" disabled={pendiente} onClick={() => agregar(d)}>
+          <Button key={d} variant="outline" className="h-16 text-2xl apaisado:h-14" disabled={pendiente} onClick={() => agregar(d)}>
             {d}
           </Button>
         ))}
         <Button
           variant="ghost"
-          className="h-16"
+          className="h-16 apaisado:h-14"
           aria-label="Borrar"
           disabled={pendiente || pin.length === 0}
           onClick={() => setPin((p) => p.slice(0, -1))}
         >
           <DeleteIcon className="size-6" />
         </Button>
-        <Button variant="outline" className="h-16 text-2xl" disabled={pendiente} onClick={() => agregar("0")}>
+        <Button variant="outline" className="h-16 text-2xl apaisado:h-14" disabled={pendiente} onClick={() => agregar("0")}>
           0
         </Button>
-        <Button className="h-16" disabled={pendiente || pin.length < MIN_DIGITOS} onClick={() => ingresar(pin)}>
+        <Button className="h-16 apaisado:h-14" disabled={pendiente || pin.length < MIN_DIGITOS} onClick={() => ingresar(pin)}>
           {pendiente ? <LoadingDots /> : "Ingresar"}
         </Button>
       </div>

@@ -4,6 +4,9 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Pantalla apaisada y baja (tablet en horizontal): ahí las pantallas largas pasan a dos columnas para no tener que scrollear. */
+@custom-variant apaisado (@media (orientation: landscape) and (max-height: 800px));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
