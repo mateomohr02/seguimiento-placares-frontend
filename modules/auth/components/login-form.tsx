@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { DeleteIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingDots } from "@/components/loading-dots";
+import { LogoNeostone } from "@/components/logo-neostone";
 import { loginAction } from "../actions/login.action";
 
 const MAX_DIGITOS = 10;
@@ -57,7 +58,8 @@ export function LoginForm() {
 
   return (
     <div className="flex w-full max-w-xs flex-col items-center gap-6">
-      <div className="flex flex-col items-center gap-1 text-center">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <LogoNeostone className="w-52" />
         <h1 className="text-xl font-semibold">Seguimiento Productivo</h1>
         <p className="text-sm text-muted-foreground">Ingresá tu PIN</p>
       </div>

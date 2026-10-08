@@ -30,6 +30,8 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // /login y /red/estado (lo consulta el comprobador de red) quedan públicos.
-  matcher: ["/((?!login|red/estado|_next/static|_next/image|favicon.ico).*)"],
+  // /login y /red/estado (lo consulta el comprobador de red) quedan públicos, igual
+  // que los archivos de imagen estáticos (logo, favicon, íconos): la pantalla de PIN
+  // los necesita antes de que haya sesión y no contienen datos.
+  matcher: ["/((?!login|red/estado|_next/static|_next/image|.*\\.(?:png|ico|svg|jpe?g|webp)$).*)"],
 };
