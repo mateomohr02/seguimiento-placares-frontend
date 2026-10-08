@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api/api-client";
 import type { EscaneoResumen } from "../types/pieza.types";
 
@@ -20,6 +21,7 @@ export async function confirmarPiezaAction(piezaId: string): Promise<ConfirmarPi
     revalidatePath("/", "layout");
     return { success: true, resumen };
   } catch (err) {
+    unstable_rethrow(err); // deja pasar el redirect al login (sesión vencida)
     const message = err instanceof ApiError ? err.message : "Error inesperado al confirmar la pieza.";
     return { success: false, message };
   }

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { apiFetch } from "@/lib/api/api-client";
+import { requireSesion } from "@/lib/auth/sesion";
+import { PERMISOS, puede } from "@/lib/auth/permisos";
 import type { Orden } from "@/modules/orden/types/orden.types";
 import type { HojaCorte } from "@/modules/hoja-corte/types/hoja-corte.types";
 import { HojasCorteLista } from "@/modules/hoja-corte/components/hojas-corte-lista";
@@ -7,6 +9,8 @@ import { HojaCorteSubir } from "@/modules/hoja-corte/components/hoja-corte-subir
 
 export default async function HojasCortePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const sesion = await requireSesion();
+  const puedeGestionar = puede(sesion, PERMISOS.DOCUMENTACION_GESTIONAR);
   const [orden, hojas] = await Promise.all([
     apiFetch<Orden>(`/ordenes/${id}`),
     apiFetch<HojaCorte[]>(`/ordenes/${id}/hojas-corte`),
@@ -23,13 +27,15 @@ export default async function HojasCortePage({ params }: { params: Promise<{ id:
         </h1>
       </div>
 
-      <HojasCorteLista ordenId={id} hojas={hojas} />
+      <HojasCorteLista ordenId={id} hojas={hojas} puedeGestionar={puedeGestionar} />
 
-      <HojaCorteSubir
-        ordenId={id}
-        codigoOrdenFabricacion={orden.codigoOrdenFabricacion}
-        numeroOrdenCustom={orden.numeroOrdenCustom}
-      />
+      {puedeGestionar && (
+        <HojaCorteSubir
+          ordenId={id}
+          codigoOrdenFabricacion={orden.codigoOrdenFabricacion}
+          numeroOrdenCustom={orden.numeroOrdenCustom}
+        />
+      )}
     </main>
   );
 }

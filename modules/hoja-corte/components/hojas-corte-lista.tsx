@@ -7,7 +7,16 @@ import type { HojaCorte } from "../types/hoja-corte.types";
 const fecha = new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" });
 const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-export function HojasCorteLista({ ordenId, hojas }: { ordenId: string; hojas: HojaCorte[] }) {
+export function HojasCorteLista({
+  ordenId,
+  hojas,
+  puedeGestionar,
+}: {
+  ordenId: string;
+  hojas: HojaCorte[];
+  /** Eliminar hojas (permiso documentacion.gestionar). */
+  puedeGestionar: boolean;
+}) {
   if (hojas.length === 0) {
     return <p className="text-sm text-muted-foreground">Esta orden todavía no tiene hojas de corte cargadas.</p>;
   }
@@ -29,7 +38,7 @@ export function HojasCorteLista({ ordenId, hojas }: { ordenId: string; hojas: Ho
           >
             Abrir
           </Link>
-          <HojaCorteEliminar hoja={h} />
+          {puedeGestionar && <HojaCorteEliminar hoja={h} />}
         </li>
       ))}
     </ul>

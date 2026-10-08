@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { apiFetch } from "@/lib/api/api-client";
+import { requireSesion } from "@/lib/auth/sesion";
+import { PERMISOS, puede } from "@/lib/auth/permisos";
 import { ModulosTable } from "@/modules/modulo/components/modulos-table";
 import type { Modulo } from "@/modules/modulo/types/modulo.types";
 import type { PedidoConOrden } from "@/modules/pedido/types/pedido.types";
@@ -17,6 +19,7 @@ export default async function PedidoDetallePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const puedeGestionar = puede(await requireSesion(), PERMISOS.DOCUMENTACION_GESTIONAR);
   const [pedido, modulos, documentos, planos] = await Promise.all([
     apiFetch<PedidoConOrden>(`/pedidos/${id}`),
     apiFetch<Modulo[]>(`/pedidos/${id}/modulos`),
@@ -56,9 +59,14 @@ export default async function PedidoDetallePage({
         <ModulosTable modulos={modulos} />
       </section>
 
-      <DocumentacionPedido pedidoId={id} codigoPedido={pedido.codigo_pedido} documentos={documentos} />
+      <DocumentacionPedido
+        pedidoId={id}
+        codigoPedido={pedido.codigo_pedido}
+        documentos={documentos}
+        puedeGestionar={puedeGestionar}
+      />
 
-      <PlanosPedido pedidoId={id} planos={planos} modulos={modulos} />
+      <PlanosPedido pedidoId={id} planos={planos} modulos={modulos} puedeGestionar={puedeGestionar} />
     </main>
   );
 }

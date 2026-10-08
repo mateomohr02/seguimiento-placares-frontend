@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { apiFetch } from "@/lib/api/api-client";
+import { requireSesion } from "@/lib/auth/sesion";
+import { PERMISOS, puede } from "@/lib/auth/permisos";
 import { PiezasTable } from "@/modules/pieza/components/piezas-table";
 import type { Pieza } from "@/modules/pieza/types/pieza.types";
 import type { ModuloConContexto } from "@/modules/modulo/types/modulo.types";
@@ -11,6 +13,7 @@ export default async function ModuloDetallePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const sesion = await requireSesion();
   const [modulo, piezas] = await Promise.all([
     apiFetch<ModuloConContexto>(`/modulos/${id}`),
     apiFetch<Pieza[]>(`/modulos/${id}/piezas`),
@@ -30,7 +33,7 @@ export default async function ModuloDetallePage({
         </div>
       </div>
 
-      <PiezasTable piezas={piezas} />
+      <PiezasTable piezas={piezas} puedeMarcar={puede(sesion, PERMISOS.PIEZAS_MARCAR)} />
     </main>
   );
 }

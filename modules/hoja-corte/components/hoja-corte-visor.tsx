@@ -139,6 +139,8 @@ export function HojaCorteVisor({
   tipoArchivo = "pdf",
   titulo,
   volverHref,
+  puedeAnotar = false,
+  puedeEliminarAnotaciones = false,
 }: {
   /** Base de la API de anotaciones del documento (ej. /hojas-corte/<id>/anotaciones). */
   anotacionesUrl: string;
@@ -147,6 +149,10 @@ export function HojaCorteVisor({
   tipoArchivo?: "pdf" | "imagen";
   titulo: string;
   volverHref: string;
+  /** Crear anotaciones (permiso documentacion.anotar). Sin esto el visor es de solo lectura. */
+  puedeAnotar?: boolean;
+  /** Borrar anotaciones y deshacer (permiso documentacion.anotaciones.eliminar). */
+  puedeEliminarAnotaciones?: boolean;
 }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [total, setTotal] = useState(0); // cantidad de páginas; 0 = todavía cargando
@@ -363,12 +369,14 @@ export function HojaCorteVisor({
           </Button>
         </div>
 
-        <Button className="h-11 px-4" variant={edicion ? "default" : "outline"} aria-pressed={edicion} onClick={alternarEdicion}>
-          <PencilIcon /> {edicion ? "Listo" : "Anotar"}
-        </Button>
+        {puedeAnotar && (
+          <Button className="h-11 px-4" variant={edicion ? "default" : "outline"} aria-pressed={edicion} onClick={alternarEdicion}>
+            <PencilIcon /> {edicion ? "Listo" : "Anotar"}
+          </Button>
+        )}
       </header>
 
-      {edicion && (
+      {puedeAnotar && edicion && (
         <BarraAnotaciones
           herramienta={herramienta}
           onHerramienta={elegirHerramienta}
@@ -378,11 +386,13 @@ export function HojaCorteVisor({
           onNivel={setNivel}
           puedeDeshacer={puedeDeshacer}
           onDeshacer={deshacer}
+          puedeEliminar={puedeEliminarAnotaciones}
         />
       )}
       <NotasDocumento
         notas={notas}
-        edicion={edicion}
+        edicion={puedeAnotar && edicion}
+        puedeBorrar={puedeEliminarAnotaciones}
         onCrear={(texto) => void crear({ tipo: "TEXTO", pagina: null, datos: { texto } })}
         onBorrar={(id) => void borrar(id)}
       />
@@ -408,7 +418,7 @@ export function HojaCorteVisor({
                 aspect={aspect}
                 scrollRoot={scrollRoot}
                 anotaciones={porPagina.get(i + 1) ?? SIN_ANOTACIONES}
-                herramienta={edicion ? herramienta : "mover"}
+                herramienta={puedeAnotar && edicion ? herramienta : "mover"}
                 color={color}
                 nivel={nivel}
                 onCrear={(a) => void crear(a)}

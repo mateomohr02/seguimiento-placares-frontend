@@ -1,6 +1,8 @@
 // Recibe el PDF crudo desde el navegador y lo reenvía al backend. Es un Route
 // Handler (no un Server Action) porque los Server Actions limitan el body a 1 MB
 // y una hoja de corte pesa 1–2 MB o más.
+import { authHeaders } from "@/lib/auth/sesion";
+
 const API_URL = process.env.API_URL ?? "http://localhost:4000/api";
 
 export async function POST(req: Request, ctx: RouteContext<"/ordenes/[id]/hojas-corte/subir">) {
@@ -15,7 +17,7 @@ export async function POST(req: Request, ctx: RouteContext<"/ordenes/[id]/hojas-
   try {
     res = await fetch(`${API_URL}/ordenes/${encodeURIComponent(id)}/hojas-corte?${query}`, {
       method: "POST",
-      headers: { "Content-Type": "application/pdf" },
+      headers: { "Content-Type": "application/pdf", ...(await authHeaders()) },
       body: await req.arrayBuffer(),
       cache: "no-store",
     });

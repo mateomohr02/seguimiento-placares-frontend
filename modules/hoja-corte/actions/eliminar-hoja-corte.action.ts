@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api/api-client";
 
 export type EliminarHojaCorteResult = { success: true } | { success: false; message: string };
@@ -12,6 +13,7 @@ export async function eliminarHojaCorteAction(hojaId: string): Promise<EliminarH
     revalidatePath("/ordenes/[id]/hojas-corte", "page");
     return { success: true };
   } catch (err) {
+    unstable_rethrow(err); // deja pasar el redirect al login (sesión vencida)
     const message = err instanceof ApiError ? err.message : "Error inesperado al eliminar la hoja de corte.";
     return { success: false, message };
   }

@@ -1,12 +1,14 @@
 // Proxy del archivo de un plano (imagen o PDF). El navegador solo habla con el
 // frontend; ver app/hojas-corte/[id]/archivo/route.ts.
+import { authHeaders } from "@/lib/auth/sesion";
+
 const API_URL = process.env.API_URL ?? "http://localhost:4000/api";
 
 export async function GET(_req: Request, ctx: RouteContext<"/planos-pedido/[id]/archivo">) {
   const { id } = await ctx.params;
   let res: Response;
   try {
-    res = await fetch(`${API_URL}/planos-pedido/${encodeURIComponent(id)}/archivo`, { cache: "no-store" });
+    res = await fetch(`${API_URL}/planos-pedido/${encodeURIComponent(id)}/archivo`, { cache: "no-store", headers: await authHeaders() });
   } catch {
     return Response.json({ message: "No se pudo comunicar con el servidor." }, { status: 502 });
   }
