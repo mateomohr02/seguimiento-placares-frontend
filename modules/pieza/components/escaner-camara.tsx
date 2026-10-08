@@ -132,8 +132,8 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
   const ultimo = items[0];
 
   return (
-    <div className="relative flex h-full w-full overflow-hidden bg-black">
-      <div className="relative h-full min-w-0 flex-1 overflow-hidden">
+    <div className="relative h-full w-full overflow-hidden bg-black">
+      <div className="absolute inset-0 overflow-hidden">
         <BotonVolver />
 
         {/* Solo en pantallas angostas: abre el historial. Toma el color del último escaneo. */}
@@ -154,7 +154,7 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
         </button>
 
         {avisoError ? (
-          <div className={cn("flex h-full items-center justify-center p-6 pt-16 text-center text-sm", secure ? "text-red-400" : "text-gray-300")}>
+          <div className={cn("flex h-full items-center justify-center p-6 pt-16 text-center text-sm md:pr-80", secure ? "text-red-400" : "text-gray-300")}>
             {avisoError}
           </div>
         ) : (
@@ -163,7 +163,7 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
             <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
 
             {errorMsg && (
-              <div className="absolute inset-x-0 top-16 m-4 rounded-xl bg-destructive/90 p-3 text-center text-sm font-medium text-white">
+              <div className="absolute inset-x-0 top-16 m-4 md:right-80 rounded-xl bg-destructive/90 p-3 text-center text-sm font-medium text-white">
                 {errorMsg}
               </div>
             )}
@@ -171,7 +171,7 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
             {/* Mira: encuadre rectangular (los Code39 son anchos) con el resto de la
                 imagen atenuada, esquinas marcadas y una línea de barrido. Es solo
                 guía visual — el lector decodifica todo el cuadro. */}
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center md:right-80">
               <div className="relative h-[28%] w-[80%] max-w-2xl rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]">
                 <span className="absolute top-0 left-0 size-8 rounded-tl-2xl border-t-4 border-l-4 border-white" />
                 <span className="absolute top-0 right-0 size-8 rounded-tr-2xl border-t-4 border-r-4 border-white" />
@@ -190,15 +190,16 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
       {/* Sidebar con una tarjeta por pieza escaneada. En pantallas angostas es un panel superpuesto. */}
       <aside
         className={cn(
-          "z-20 h-full bg-background text-foreground md:static md:block md:w-80 md:shrink-0 md:border-l",
-          panelAbierto ? "absolute inset-y-0 right-0 block w-[min(22rem,92%)] shadow-2xl" : "hidden",
+          "pointer-events-none absolute inset-y-0 right-0 z-20 w-[min(22rem,92%)] md:block md:w-80",
+          // En pantallas angostas es un panel que se abre; se oscurece un poco para leerse sobre la cámara.
+          panelAbierto ? "block max-md:bg-black/35 max-md:backdrop-blur-sm" : "hidden",
         )}
       >
         <button
           type="button"
           onClick={() => setPanelAbierto(false)}
           aria-label="Cerrar historial"
-          className="absolute top-2.5 right-2 rounded-full p-1.5 hover:bg-muted md:hidden"
+          className="pointer-events-auto absolute top-4 right-3 z-10 rounded-full border border-white/30 bg-black/30 p-1.5 text-white backdrop-blur-xl md:hidden"
         >
           <XIcon className="size-4" />
         </button>

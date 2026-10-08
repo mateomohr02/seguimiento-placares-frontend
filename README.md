@@ -312,7 +312,7 @@ El detalle más fino: cada pieza física de ese módulo con **Código** (el de l
 
 ### Vista 5 — Escaneo (`/escaneo`)
 
-Pantalla completa pensada para tablet: la cámara ocupa el área principal y, a la derecha, un **sidebar con el historial de la sesión** ("modo continuo": no hay que tocar nada entre un escaneo y otro, la cámara queda siempre escuchando).
+Pantalla completa pensada para tablet: la cámara ocupa toda la pantalla y, a la derecha, un **sidebar transparente con el historial de la sesión** que se superpone a la imagen (las tarjetas tienen estilo "vidrio": translúcidas y desenfocadas, con un leve tinte verde o amarillo; la lista se desplaza con el dedo y la cámara sigue visible y activa entre tarjetas) ("modo continuo": no hay que tocar nada entre un escaneo y otro, la cámara queda siempre escuchando).
 
 - **Mira**: un rectángulo con esquinas marcadas y una línea de barrido, con el resto de la imagen atenuada, para apuntar el código de barras. Es solo una guía visual: el lector busca el código en todo el cuadro.
 - Apunta la cámara al código de barras de la etiqueta de corte (siempre 7 dígitos).
