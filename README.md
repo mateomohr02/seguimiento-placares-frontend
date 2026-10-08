@@ -246,7 +246,7 @@ Al abrir la app aparece la pantalla de **PIN** (teclado numérico en pantalla; c
 | Rol | Qué ve y qué puede hacer |
 |---|---|
 | `admin` / `tecnica` | Todo: agregar, archivar y eliminar órdenes; escanear y marcar piezas; subir y eliminar documentación; anotar y borrar anotaciones |
-| `fabrica` (estaciones) | Ver órdenes, pedidos, módulos, despieces y documentación; **Escanear** y **Finalizado / Pendiente** por pieza; **anotar** sobre los documentos (pero **sin** Borrar ni Deshacer). No ve "Agregar orden", Archivar ni Eliminar, ni subir/eliminar documentos |
+| `fabrica` (estaciones) | Ver órdenes, pedidos, módulos, despieces y documentación; **Escanear** y **Finalizado / Pendiente** por pieza; **anotar** sobre los documentos (puede deshacer lo que anota en esa sesión, pero **no** borrar anotaciones ya guardadas). No ve "Agregar orden", Archivar ni Eliminar, ni subir/eliminar documentos |
 | `gerencia` | Solo lectura: no ve "Escanear" (entrar a `/escaneo` lo devuelve al listado), ni botones de piezas, ni "Anotar", ni subir/eliminar |
 
 ### Aviso de red
@@ -353,12 +353,12 @@ Si el PDF no tiene texto (un escaneo) no se puede verificar y se deja pasar. Los
 Se abre con **Abrir**. Muestra todas las hojas en una columna con scroll; solo dibuja las cercanas a la pantalla (una orden puede tener 80 hojas).
 
 - **Arriba**: Volver, título, número de hoja (se puede escribir un número y Enter para saltar), zoom − / + (50 % a 300 %), "ajustar al ancho" y **Anotar**.
-- Las anotaciones siempre se **ven**; solo se pueden crear tocando **Anotar** (así el operario no dibuja sin querer). **Listo** vuelve al modo lectura.
-- **Herramientas** (modo Anotar): **Mover** (scroll y zoom con normalidad), **Lápiz**, **Resaltador** (translúcido), **Texto** (tocá un lugar, escribí y Enter), **Borrar** (tocá una anotación para quitarla) y **Deshacer** (quita lo último que anotó *este* dispositivo). Cuatro colores y tres grosores. Con Lápiz o Resaltador el dedo **dibuja** (no scrollea): para moverte, pasá a "Mover".
+- Las anotaciones siempre se **ven**; solo se pueden crear tocando **Anotar** (así el operario no dibuja sin querer). Lo que se anota **no se guarda al instante**: queda en la pantalla hasta tocar **Listo**, que guarda todo y vuelve al modo lectura. **Descartar** (aparece si hay cambios) tira lo no guardado; si hay cambios sin guardar, **Volver** y cerrar la pestaña avisan antes de perderlos.
+- **Herramientas** (modo Anotar): **Mover** (scroll y zoom con normalidad), **Lápiz**, **Resaltador** (translúcido), **Texto** (tocá un lugar, escribí y Enter), **Borrar** (tocá una anotación para quitarla) y **Deshacer** (revierte, paso a paso, lo que se hizo *en esta sesión de edición*: nunca toca lo que ya estaba guardado). Cuatro colores y tres grosores. Con Lápiz o Resaltador el dedo **dibuja** (no scrollea): para moverte, pasá a "Mover".
 - **Notas del documento**: en modo Anotar se pueden agregar notas que valen para todo el documento (ej. "Págs. 77 a 80: MDF, bajan aparte"). Se muestran **siempre**, en una franja amarilla arriba.
-- **Varias tablets**: las anotaciones se guardan en el servidor al instante y cada visor abierto se refresca cada 20 segundos.
+- **Varias tablets**: las anotaciones se guardan en el servidor al tocar **Listo** y cada visor abierto se refresca cada 20 segundos (lo que otro dispositivo todavía no guardó no se ve).
 - El archivo original **nunca se modifica**: las anotaciones se dibujan encima. Se guardan con coordenadas relativas al tamaño de la página (se ven igual con cualquier zoom o dispositivo).
-- **Permisos**: el botón **Anotar** solo aparece con el permiso `documentacion.anotar` (admin, tecnica y fabrica); **Borrar** y **Deshacer** y el borrado de notas, solo con `documentacion.anotaciones.eliminar` (admin y tecnica). Subir y eliminar documentos requiere `documentacion.gestionar`. Gerencia solo ve. No se registra quién anotó.
+- **Permisos**: el botón **Anotar** solo aparece con el permiso `documentacion.anotar` (admin, tecnica y fabrica); **Borrar** (la herramienta y la X de las notas) sobre anotaciones **ya guardadas**, solo con `documentacion.anotaciones.eliminar` (admin y tecnica); esos borrados también se aplican recién al tocar **Listo** y se pueden deshacer antes. **Deshacer** lo tienen todos los que pueden anotar, pero solo sobre cambios de la sesión en curso. Subir y eliminar documentos requiere `documentacion.gestionar`. Gerencia solo ve. No se registra quién anotó.
 
 ### Para quien programa
 

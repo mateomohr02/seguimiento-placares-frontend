@@ -37,7 +37,7 @@ export function BarraAnotaciones({
   onNivel: (n: number) => void;
   puedeDeshacer: boolean;
   onDeshacer: () => void;
-  /** Sin permiso de eliminar anotaciones no hay Borrar ni Deshacer. */
+  /** Sin permiso de eliminar anotaciones no hay herramienta Borrar (Deshacer revierte solo lo de esta sesión). */
   puedeEliminar: boolean;
 }) {
   const usaColor = herramienta === "lapiz" || herramienta === "resaltador" || herramienta === "texto";
@@ -95,11 +95,9 @@ export function BarraAnotaciones({
         </>
       )}
 
-      {puedeEliminar && (
-        <Button variant="outline" className="ml-auto h-11 px-3" disabled={!puedeDeshacer} onClick={onDeshacer}>
-          <Undo2Icon /> Deshacer
-        </Button>
-      )}
+      <Button variant="outline" className="ml-auto h-11 px-3" disabled={!puedeDeshacer} onClick={onDeshacer}>
+        <Undo2Icon /> Deshacer
+      </Button>
     </div>
   );
 }
