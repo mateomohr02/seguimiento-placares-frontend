@@ -68,6 +68,7 @@ app/frontend/
 │   ├── column-filter.tsx           # Filtro de columna estilo Excel (lista de valores con checkbox + búsqueda)
 │   ├── network-guard.tsx           # Comprobador de red: cubre la app con un aviso si el dispositivo no llega al servidor
 │   ├── volver-link.tsx            # Botón "volver" único de la app (variantes claro, acento y vidrio); usarlo siempre en vez de links de texto
+│   ├── logo-neostone.tsx          # Logo de Neostone (public/logo-neostone.png, blanco sobre transparente; se tiñe al carbón de la paleta con filtros CSS). Se ve en el login y arriba a la izquierda del listado de órdenes
 │   └── loading-dots.tsx            # Tres puntos que crecen y se achican (carga de páginas y botones)
 ├── proxy.ts                        # Puerta de entrada: sin sesión vigente, todo redirige a /login (salvo /login y /red/estado)
 ├── app/login/page.tsx              # Pantalla de PIN
@@ -380,6 +381,7 @@ Se abre con **Abrir**. Muestra todas las hojas en una columna con scroll; solo d
 - **Tamaño de letra**: la base es 17,5 px (un poco más que el default de 16 px); todo Tailwind escala con eso.
 - **Carga**: tres puntos que crecen y se achican en sucesión (`LoadingDots`) — en la pantalla de carga de cada página (`app/loading.tsx`) y dentro de los botones mientras corre una acción.
 - **Tipografía**: Geist (variable `--font-geist-sans`).
+- **Logo y favicon**: el logo (`public/logo-neostone.png`, 287×63, blanco sobre transparente) se muestra en negro carbón con el componente `LogoNeostone`. El favicon (`app/favicon.ico`, `app/icon.png`, `app/apple-icon.png`) es el isotipo (la "S" hexagonal) en blanco sobre un cuadrado carbón; `apple-icon.png` es el que usan las tablets al "agregar a pantalla de inicio". Los archivos de imagen estáticos (`.png`, `.ico`, `.svg`, `.jpg`, `.webp`) quedan fuera de la puerta de entrada de `proxy.ts`, porque la pantalla de PIN los necesita antes de que haya sesión. El logo tiene poca resolución: si se consigue una versión SVG o más grande, reemplazar el archivo (y regenerar los íconos desde el isotipo).
 
 Los tokens de color están en [`app/globals.css`](app/globals.css) (variables `--primary`, `--background`, `--gold`, etc.). El bloque `.dark` sigue definido pero la app no lo usa.
 
