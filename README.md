@@ -142,20 +142,90 @@ https://<IP de esta PC>/
 
 La primera vez, el navegador de la tablet va a avisar que el certificado no es de una autoridad conocida (es autofirmado) — hay que tocar "Avanzado" → "Continuar de todos modos" **una sola vez**. Después de eso, la cámara funciona con normalidad.
 
-### ⚠️ La IP de esta PC puede cambiar
+### ⚠️ La IP de esta PC cambió: paso a paso
 
-Si la red le asigna la IP por DHCP (lo más común), puede cambiar cada vez que la PC se reconecta a la red. Cuando eso pasa, hay que actualizar **dos archivos**:
+Si la red le asigna la IP por DHCP (lo más común), la IP puede cambiar cada vez que la PC se reconecta. La IP está escrita en **dos archivos** y hay que actualizar ambos; si queda una IP vieja, la app falla de una de estas formas:
 
-1. [`infra/Caddyfile`](../../infra/Caddyfile) — el dominio/IP que Caddy sirve.
-2. [`next.config.ts`](next.config.ts) — `allowedDevOrigins` y `serverActions.allowedOrigins` (si no coinciden con la IP real, la app carga pero **las acciones como escanear o agregar una orden fallan silenciosamente** — es un mecanismo de seguridad de Next.js en modo desarrollo, no un bug).
+| Síntoma | Qué quedó con la IP vieja |
+|---|---|
+| La tablet no abre `https://<IP>/` (no responde o "conexión no privada" sin opción de continuar) | [`infra/Caddyfile`](../../infra/Caddyfile) |
+| La página carga pero **los botones no responden, escanear o agregar una orden no hace nada, o la cámara queda en negro** | [`next.config.ts`](next.config.ts): `allowedDevOrigins` no cubre la IP (bloqueo de seguridad de Next.js, no es un bug). Se ve en la terminal del frontend como `Blocked cross-origin request to Next.js dev resource` |
 
-Después de cambiar `next.config.ts` hay que **reiniciar** `npm run dev` (ese archivo no se recarga solo). Después de cambiar el `Caddyfile`, alcanza con recargarlo sin reiniciar el proceso:
+Todos los comandos se corren en PowerShell **parados en la carpeta raíz del proyecto** (`seguimiento-placares`).
+
+**1. Averiguar la IP nueva de la PC**
 
 ```powershell
-& "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\CaddyServer.Caddy_Microsoft.Winget.Source_8wekyb3d8bbwe\caddy.exe" reload --config infra\Caddyfile
+Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } | Select-Object InterfaceAlias, IPAddress
 ```
 
-Para evitar este problema de raíz, lo ideal es pedir una **IP fija o una reserva DHCP** para esta PC en el router/switch de la fábrica (así la IP nunca cambia).
+Usá la que figura en el adaptador conectado a la red de la fábrica (típicamente `Ethernet` o `Wi-Fi`, algo como `192.168.3.xxx`). Si hay más de una, es la que la tablet puede alcanzar. (También sirve `ipconfig` → "Dirección IPv4".) En los pasos siguientes, `192.168.3.NNN` es la IP **nueva**.
+
+**2. Actualizar el Caddyfile** — [`infra/Caddyfile`](../../infra/Caddyfile)
+
+Cambiá la IP en la línea del sitio (y, si querés, en el comentario de arriba). `localhost` se deja:
+
+```
+localhost, 192.168.3.NNN {
+	tls internal
+	reverse_proxy localhost:3000
+}
+```
+
+Tiene que figurar **la IP explícita** (no un `:443` genérico): con ella Caddy emite el certificado para esa IP.
+
+**3. Actualizar `next.config.ts`** — [`next.config.ts`](next.config.ts)
+
+**Normalmente no hace falta tocarlo**: el archivo ya permite toda la red de la fábrica con un patrón por rango, así que mientras la IP siga siendo `192.168.3.x` este paso se saltea:
+
+```ts
+allowedDevOrigins: ["192.168.3.*"],
+// ...
+serverActions: { allowedOrigins: ["192.168.3.*"] },
+```
+
+Solo hay que editarlo si la PC pasa a otro rango (por ejemplo `192.168.10.x`: usar `"192.168.10.*"`) — en ese caso hay que reiniciar `npm run dev` (paso 5).
+
+> ⚠️ **No usar un `"*"` suelto.** En esta versión de Next un `*` reemplaza **una sola** etiqueta del nombre de host, y una IP tiene cuatro (`192.168.3.167`), así que `"*"` no la cubre. Con eso el dev server bloquea sus recursos de desarrollo desde la tablet (en la terminal aparece `Blocked cross-origin request to Next.js dev resource /_next/hmr from "192.168.3.x"`): la página carga, pero **los botones no responden y la cámara queda en negro**, porque el JavaScript no se activa. El patrón correcto es el de arriba, con la IP completa o con `*` reemplazando solo el último número.
+
+**4. Validar y recargar Caddy** (sin reiniciarlo ni cortar nada)
+
+Correlo desde la **carpeta raíz del proyecto** (`seguimiento-placares`, no desde `app\frontend`), porque `infra\Caddyfile` es una ruta relativa a ella:
+
+```powershell
+cd "C:\Users\Usuario\Desktop\Claude Projects\seguimiento-placares"
+$caddy = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\CaddyServer.Caddy_Microsoft.Winget.Source_8wekyb3d8bbwe\caddy.exe"
+& $caddy validate --config infra\Caddyfile --adapter caddyfile
+& $caddy reload --config infra\Caddyfile
+```
+
+Debe decir `Valid configuration`. Los renglones rojos con `"level":"info"` que aparecen en PowerShell son solo el log de Caddy, no un error. Si Caddy no estaba corriendo, levantalo como se explica más arriba (`caddy run --config Caddyfile`, ahí sí desde la carpeta `infra`).
+
+**5. Reiniciar el frontend** — `next.config.ts` no se recarga solo
+
+En la terminal donde corre `npm run dev` (carpeta `app\frontend`): `Ctrl + C` y volver a correr:
+
+```powershell
+npm run dev
+```
+
+El backend no necesita reinicio.
+
+**6. Comprobar desde la PC**
+
+```powershell
+curl.exe -k -s -o NUL -w "HTTP %{http_code}`n" https://192.168.3.NNN/
+```
+
+Debe dar `HTTP 200`. Si da `502`, falta levantar el frontend (paso 5); si no responde, revisá el Caddyfile (paso 2) y que el puerto 443 esté abierto en el firewall de Windows (`New-NetFirewallRule -DisplayName "Caddy HTTPS 443" -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow`, una sola vez, como administrador).
+
+**7. En cada tablet: aceptar el certificado de la IP nueva**
+
+Entrá por `https://192.168.3.NNN/`. Como el certificado es autofirmado y ahora es para otra IP, el navegador vuelve a avisar: **"Avanzado" → "Continuar de todos modos"** (una sola vez por tablet). Después la cámara y el escaneo funcionan igual. Conviene actualizar el acceso directo / marcador de la tablet con la IP nueva.
+
+**8. Prueba final**: agregá o abrí una orden y escaneá una pieza desde la tablet. Si la página carga pero no pasa nada al escanear o agregar, repasá el paso 3 y que se haya reiniciado `npm run dev` (paso 5).
+
+**Para no repetir esto: reserva DHCP o IP fija.** Pedirle a sistemas que reserven en el router/switch de la fábrica la IP de esta PC (por su dirección MAC) hace que la IP nunca más cambie, y no hay que volver a tocar ninguno de los dos archivos ni re-aceptar el certificado en las tablets. Es la solución de fondo; este paso a paso es solo el parche cuando la IP ya cambió.
 
 ---
 
@@ -300,7 +370,7 @@ Los tokens de color están en [`app/globals.css`](app/globals.css) (variables `-
 | La página carga pero la lista de órdenes tira error, o no carga nada | El backend no está corriendo, o `API_URL` en `.env.local` no apunta a donde está | Confirmá que `npm run dev` del backend esté corriendo y que responda en `http://localhost:4000/api/health` |
 | Desde la tablet, la cámara no se activa nunca (mensaje "requiere HTTPS") | Estás entrando por HTTP directo al puerto 3000 (`http://192.168.x.x:3000`) en vez de por Caddy | Entrá por `https://<IP>/` (sin `:3000`, con `https://`) — ver [Cámara y HTTPS](#cámara-y-https--por-qué-hace-falta-caddy) |
 | La cámara se activa un segundo y se corta | Es un efecto de "Strict Mode" de React en modo desarrollo (monta y desmonta el componente dos veces para detectar fugas) — ya está resuelto en el código actual con un pequeño retraso al pedir la cámara, pero si volvés a ver esto después de tocar `escaner-camara.tsx`, es la primera sospecha | Revisar `modules/pieza/components/escaner-camara.tsx` |
-| Agregar una orden o escanear una pieza no hace nada, sin error visible | La IP de la PC cambió y `next.config.ts` todavía tiene la vieja (bloqueo silencioso de seguridad de Next.js) | Actualizar `allowedDevOrigins` en `next.config.ts` con la IP actual y reiniciar `npm run dev` |
+| Agregar una orden o escanear una pieza no hace nada, sin error visible | La IP de la PC cambió y `next.config.ts` todavía tiene la vieja (bloqueo silencioso de seguridad de Next.js) | Seguir el paso a paso de la sección **"La IP de esta PC cambió: paso a paso"** (en resumen: actualizar `allowedDevOrigins` en `next.config.ts` y el `Caddyfile` con la IP actual, y reiniciar `npm run dev`) |
 | El certificado de HTTPS no es de confianza | Es autofirmado, a propósito (no hace falta pagar/gestionar un certificado público para una red interna) | Aceptar el aviso del navegador una vez por dispositivo |
 | El visor muestra solo tres puntos y no abre la hoja | El PDF no llegó o el navegador es muy viejo para pdf.js | Recargar; si el aviso dice "No se pudo abrir la hoja de corte", revisar que el backend esté corriendo. En desarrollo (`npm run dev`), la **primera** carga del visor tarda porque compila pdf.js; en producción abre en menos de un segundo |
 | Subir un PDF falla con "Este PDF es del pedido X…" / "parece ser …" | Se está cargando en el pedido o tipo equivocado (es la verificación funcionando) | Subirlo donde corresponde, o elegir el tipo correcto |
