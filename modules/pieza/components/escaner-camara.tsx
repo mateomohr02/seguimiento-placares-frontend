@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { cn } from "cn";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, ListIcon, XIcon } from "lucide-react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType, NotFoundException } from "@zxing/library";
 import type { IScannerControls } from "@zxing/browser";
 import { escanearPiezaAction } from "../actions/escanear-pieza.action";
-import type { EscaneoResumen } from "../types/pieza.types";
+import { useHistorialEscaneo } from "../hooks/use-historial-escaneo";
+import { HistorialEscaneo } from "./historial-escaneo";
 
 // diseño.md Vista 5 — modo continuo, código siempre 7 dígitos (idUnico,
 // Code39 fijo). Evita reprocesar el mismo código mientras sigue en cuadro
@@ -30,9 +31,12 @@ function BotonVolver() {
   );
 }
 
-export function EscanerCamara() {
+export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; expiraEn: number }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [resumen, setResumen] = useState<EscaneoResumen | null>(null);
+  // Historial de la sesión (en el navegador, se limpia al cerrar/vencer la sesión).
+  const { items, registrar } = useHistorialEscaneo(claveSesion, expiraEn);
+  // En pantallas angostas el historial es un panel que se abre con un botón.
+  const [panelAbierto, setPanelAbierto] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [secure, setSecure] = useState(true);
@@ -55,12 +59,11 @@ export function EscanerCamara() {
 
     if (!result.success) {
       setErrorMsg(result.message);
-      setResumen(null);
       return;
     }
     setErrorMsg(null);
-    setResumen(result.resumen);
-  }, []);
+    registrar(result.resumen);
+  }, [registrar]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -120,77 +123,87 @@ export function EscanerCamara() {
     };
   }, [handleDecoded]);
 
-  if (!secure) {
-    return (
-      <div className="relative flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
-        <BotonVolver />
-        El acceso a la cámara requiere HTTPS (diseño.md §10.2). Entrá por la URL segura de la tablet,
-        no por HTTP plano.
-      </div>
-    );
-  }
+  // Contenido del área de cámara: aviso de error (la cámara no se puede usar) o la
+  // cámara con su mira. El historial (sidebar) se ve siempre.
+  const avisoError = !secure
+    ? "El acceso a la cámara requiere HTTPS (diseño.md §10.2). Entrá por la URL segura de la tablet, no por HTTP plano."
+    : cameraError;
 
-  if (cameraError) {
-    return (
-      <div className="relative flex h-full items-center justify-center p-6 text-center text-sm text-destructive">
-        <BotonVolver />
-        {cameraError}
-      </div>
-    );
-  }
+  const ultimo = items[0];
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-black">
-      <BotonVolver />
+    <div className="relative flex h-full w-full overflow-hidden bg-black">
+      <div className="relative h-full min-w-0 flex-1 overflow-hidden">
+        <BotonVolver />
 
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
-
-      {errorMsg && (
-        <div className="absolute inset-x-0 top-0 m-4 rounded-xl bg-destructive/90 p-3 text-center text-sm font-medium text-white">
-          {errorMsg}
-        </div>
-      )}
-
-      {/* Mira: encuadre rectangular (los Code39 son anchos) con el resto de la
-          imagen atenuada, esquinas marcadas y una línea de barrido. Es solo
-          guía visual — el lector decodifica todo el cuadro. */}
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="relative h-[28%] w-[80%] max-w-2xl rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]">
-          <span className="absolute top-0 left-0 size-8 rounded-tl-2xl border-t-4 border-l-4 border-white" />
-          <span className="absolute top-0 right-0 size-8 rounded-tr-2xl border-t-4 border-r-4 border-white" />
-          <span className="absolute bottom-0 left-0 size-8 rounded-bl-2xl border-b-4 border-l-4 border-white" />
-          <span className="absolute right-0 bottom-0 size-8 rounded-br-2xl border-r-4 border-b-4 border-white" />
-          <span
-            className="absolute inset-x-3 h-0.5 rounded-full bg-gold shadow-[0_0_8px_var(--gold)]"
-            style={{ animation: "scan-line 2.4s ease-in-out infinite" }}
-          />
-        </div>
-      </div>
-
-      {resumen && (
-        <div
+        {/* Solo en pantallas angostas: abre el historial. Toma el color del último escaneo. */}
+        <button
+          type="button"
+          onClick={() => setPanelAbierto(true)}
           className={cn(
-            "absolute inset-x-0 bottom-0 m-4 rounded-xl p-4 shadow-lg",
-            resumen.yaEscaneada ? "bg-yellow-300 text-yellow-950" : "bg-green-600 text-white",
+            "absolute top-4 right-4 z-10 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium backdrop-blur md:hidden",
+            !ultimo
+              ? "bg-black/60 text-white"
+              : ultimo.yaEscaneada
+                ? "bg-yellow-300 text-yellow-950"
+                : "bg-green-600 text-white",
           )}
         >
-          <p className="text-sm font-semibold">
-            {resumen.yaEscaneada ? "Pieza ya escaneada anteriormente" : "Pieza registrada"}
-          </p>
-          <p className="text-sm opacity-80">
-            Orden {resumen.orden.numeroOrdenCustom} · Pedido {resumen.pedido.codigo_pedido}
-          </p>
-          <p className="text-lg font-semibold">
-            {resumen.pieza.descripcion ?? `${resumen.pieza.familia} / ${resumen.pieza.articulo}`} para el
-            módulo {resumen.modulo.descripcion} ({resumen.modulo.idEscena})
-          </p>
-          <p className="text-base">
-            {resumen.pieza.medida1} × {resumen.pieza.medida2} · {resumen.pieza.color} · idUnico{" "}
-            {resumen.pieza.idUnico}
-          </p>
-        </div>
-      )}
+          <ListIcon className="size-4" />
+          Escaneadas ({items.length})
+        </button>
+
+        {avisoError ? (
+          <div className={cn("flex h-full items-center justify-center p-6 pt-16 text-center text-sm", secure ? "text-red-400" : "text-gray-300")}>
+            {avisoError}
+          </div>
+        ) : (
+          <>
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+
+            {errorMsg && (
+              <div className="absolute inset-x-0 top-16 m-4 rounded-xl bg-destructive/90 p-3 text-center text-sm font-medium text-white">
+                {errorMsg}
+              </div>
+            )}
+
+            {/* Mira: encuadre rectangular (los Code39 son anchos) con el resto de la
+                imagen atenuada, esquinas marcadas y una línea de barrido. Es solo
+                guía visual — el lector decodifica todo el cuadro. */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="relative h-[28%] w-[80%] max-w-2xl rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]">
+                <span className="absolute top-0 left-0 size-8 rounded-tl-2xl border-t-4 border-l-4 border-white" />
+                <span className="absolute top-0 right-0 size-8 rounded-tr-2xl border-t-4 border-r-4 border-white" />
+                <span className="absolute bottom-0 left-0 size-8 rounded-bl-2xl border-b-4 border-l-4 border-white" />
+                <span className="absolute right-0 bottom-0 size-8 rounded-br-2xl border-r-4 border-b-4 border-white" />
+                <span
+                  className="absolute inset-x-3 h-0.5 rounded-full bg-gold shadow-[0_0_8px_var(--gold)]"
+                  style={{ animation: "scan-line 2.4s ease-in-out infinite" }}
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Sidebar con una tarjeta por pieza escaneada. En pantallas angostas es un panel superpuesto. */}
+      <aside
+        className={cn(
+          "z-20 h-full bg-background text-foreground md:static md:block md:w-80 md:shrink-0 md:border-l",
+          panelAbierto ? "absolute inset-y-0 right-0 block w-[min(22rem,92%)] shadow-2xl" : "hidden",
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setPanelAbierto(false)}
+          aria-label="Cerrar historial"
+          className="absolute top-2.5 right-2 rounded-full p-1.5 hover:bg-muted md:hidden"
+        >
+          <XIcon className="size-4" />
+        </button>
+        <HistorialEscaneo items={items} />
+      </aside>
     </div>
   );
 }

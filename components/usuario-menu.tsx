@@ -1,6 +1,5 @@
-import { LogOutIcon, UserIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { logoutAction } from "@/modules/auth/actions/login.action";
+import { UserIcon } from "lucide-react";
+import { SalirForm } from "@/modules/auth/components/salir-form";
 import { getSesion } from "@/lib/auth/sesion";
 
 // Quién está usando la app, y salir. Se muestra en el listado de órdenes (Vista 1).
@@ -14,11 +13,7 @@ export async function UsuarioMenu() {
       <span>
         <span className="font-medium text-foreground">{sesion.nombre}</span> · {sesion.rol}
       </span>
-      <form action={logoutAction}>
-        <Button type="submit" variant="ghost" size="sm" className="gap-1">
-          <LogOutIcon /> Salir
-        </Button>
-      </form>
+      <SalirForm />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ColumnFilter } from "@/components/column-filter";
 import { EstadoBadge, ESTADO_LABEL } from "@/components/estado-badge";
 import { Button } from "@/components/ui/button";
@@ -37,8 +37,22 @@ function passes(pieza: Pieza, selection: Selection, skip?: FilterKey) {
   });
 }
 
-export function PiezasTable({ piezas, puedeMarcar }: { piezas: Pieza[]; puedeMarcar: boolean }) {
+export function PiezasTable({
+  piezas,
+  puedeMarcar,
+  resaltarId,
+}: {
+  piezas: Pieza[];
+  puedeMarcar: boolean;
+  /** Pieza a ubicar (viene de una tarjeta del historial de escaneo): se resalta y se centra en pantalla. */
+  resaltarId?: string;
+}) {
   const [selection, setSelection] = useState<Selection>({});
+
+  useEffect(() => {
+    if (!resaltarId) return;
+    document.getElementById(`pieza-${resaltarId}`)?.scrollIntoView({ block: "center" });
+  }, [resaltarId]);
 
   const rows = useMemo(() => piezas.filter((p) => passes(p, selection)), [piezas, selection]);
 
@@ -106,7 +120,11 @@ export function PiezasTable({ piezas, puedeMarcar }: { piezas: Pieza[]; puedeMar
             </TableRow>
           )}
           {rows.map((pieza) => (
-            <TableRow key={pieza.id}>
+            <TableRow
+              key={pieza.id}
+              id={`pieza-${pieza.id}`}
+              className={pieza.id === resaltarId ? "bg-gold/25 outline-2 -outline-offset-2 outline-gold hover:bg-gold/25" : undefined}
+            >
               <TableCell className="font-medium">{pieza.idUnico ?? "—"}</TableCell>
               <TableCell>{pieza.familia}</TableCell>
               <TableCell>{pieza.articulo}</TableCell>
