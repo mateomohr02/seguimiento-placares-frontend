@@ -58,7 +58,7 @@ export function LoginForm() {
   return (
     <div className="flex w-full max-w-xs flex-col items-center gap-6">
       <div className="flex flex-col items-center gap-1 text-center">
-        <h1 className="text-xl font-semibold">Seguimiento de placares</h1>
+        <h1 className="text-xl font-semibold">Seguimiento Productivo</h1>
         <p className="text-sm text-muted-foreground">Ingresá tu PIN</p>
       </div>
 
