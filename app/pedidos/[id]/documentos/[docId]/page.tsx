@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { apiFetch } from "@/lib/api/api-client";
+import { requireSesion } from "@/lib/auth/sesion";
+import { PERMISOS, puede } from "@/lib/auth/permisos";
 import type { PedidoConOrden } from "@/modules/pedido/types/pedido.types";
 import type { DocumentoPedido } from "@/modules/documento-pedido/types/documento-pedido.types";
 import { ETIQUETA_TIPO } from "@/modules/documento-pedido/types/documento-pedido.types";
@@ -11,6 +13,7 @@ export default async function DocumentoPedidoVisorPage({
   params: Promise<{ id: string; docId: string }>;
 }) {
   const { id, docId } = await params;
+  const sesion = await requireSesion();
   const [pedido, documentos] = await Promise.all([
     apiFetch<PedidoConOrden>(`/pedidos/${id}`),
     apiFetch<DocumentoPedido[]>(`/pedidos/${id}/documentos`),
@@ -27,6 +30,8 @@ export default async function DocumentoPedidoVisorPage({
       src={`/documentos-pedido/${doc.id}/archivo`}
       titulo={`Pedido ${pedido.codigo_pedido} — ${titulo}`}
       volverHref={`/pedidos/${id}`}
+      puedeAnotar={puede(sesion, PERMISOS.DOCUMENTACION_ANOTAR)}
+      puedeEliminarAnotaciones={puede(sesion, PERMISOS.ANOTACIONES_ELIMINAR)}
     />
   );
 }

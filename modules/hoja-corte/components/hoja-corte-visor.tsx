@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, MinusIcon, PencilIcon, PlusIcon, ScanIcon } from "lucide-react";
+import { ArrowLeftIcon, MinusIcon, PencilIcon, PlusIcon, ScanIcon, XIcon } from "lucide-react";
 import type { PDFDocumentProxy, PDFDocumentLoadingTask } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { LoadingDots } from "@/components/loading-dots";
@@ -139,6 +139,8 @@ export function HojaCorteVisor({
   tipoArchivo = "pdf",
   titulo,
   volverHref,
+  puedeAnotar = false,
+  puedeEliminarAnotaciones = false,
 }: {
   /** Base de la API de anotaciones del documento (ej. /hojas-corte/<id>/anotaciones). */
   anotacionesUrl: string;
@@ -147,6 +149,10 @@ export function HojaCorteVisor({
   tipoArchivo?: "pdf" | "imagen";
   titulo: string;
   volverHref: string;
+  /** Crear anotaciones (permiso documentacion.anotar). Sin esto el visor es de solo lectura. */
+  puedeAnotar?: boolean;
+  /** Borrar anotaciones y deshacer (permiso documentacion.anotaciones.eliminar). */
+  puedeEliminarAnotaciones?: boolean;
 }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [total, setTotal] = useState(0); // cantidad de páginas; 0 = todavía cargando
@@ -165,7 +171,8 @@ export function HojaCorteVisor({
   const rafRef = useRef(0);
 
   // Anotaciones (dibujo / texto / notas del documento).
-  const { anotaciones, crear, borrar, deshacer, puedeDeshacer } = useAnotaciones(anotacionesUrl, REFRESCO_ANOTACIONES_MS);
+  const { anotaciones, crear, borrar, deshacer, puedeDeshacer, hayCambios, guardando, guardar, descartar } =
+    useAnotaciones(anotacionesUrl, REFRESCO_ANOTACIONES_MS);
   const [edicion, setEdicion] = useState(false);
   const [herramienta, setHerramienta] = useState<Herramienta>("mover");
   const [color, setColor] = useState(paletaDe("lapiz")[0]);
@@ -188,10 +195,33 @@ export function HojaCorteVisor({
     if (!paleta.includes(color)) setColor(paleta[0]);
   }
 
-  function alternarEdicion() {
-    setEdicion((e) => !e);
+  function empezarEdicion() {
+    setEdicion(true);
     setHerramienta("mover");
   }
+
+  // "Listo": guarda lo anotado en esta sesión y vuelve al modo lectura. Si algo
+  // falla se queda en edición con lo que falta, para reintentar.
+  async function terminarEdicion() {
+    if (hayCambios && !(await guardar())) return;
+    setEdicion(false);
+    setHerramienta("mover");
+  }
+
+  function descartarCambios() {
+    if (!window.confirm("¿Descartar las anotaciones sin guardar?")) return;
+    descartar();
+    setEdicion(false);
+    setHerramienta("mover");
+  }
+
+  // Avisa antes de perder anotaciones sin guardar (cerrar la pestaña o salir con "Volver").
+  useEffect(() => {
+    if (!hayCambios) return;
+    const aviso = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [hayCambios]);
 
   // Carga del documento.
   useEffect(() => {
@@ -301,7 +331,13 @@ export function HojaCorteVisor({
   return (
     <div className="flex h-dvh flex-col bg-muted">
       <header className="flex flex-wrap items-center gap-2 border-b bg-background px-3 py-2">
-        <Link href={volverHref} className={buttonVariants({ variant: "outline", className: "h-11 px-4" })}>
+        <Link
+          href={volverHref}
+          onClick={(e) => {
+            if (hayCambios && !window.confirm("Tenés anotaciones sin guardar. ¿Salir sin guardarlas?")) e.preventDefault();
+          }}
+          className={buttonVariants({ variant: "outline", className: "h-11 px-4" })}
+        >
           <ArrowLeftIcon /> Volver
         </Link>
         <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{titulo}</h1>
@@ -363,12 +399,25 @@ export function HojaCorteVisor({
           </Button>
         </div>
 
-        <Button className="h-11 px-4" variant={edicion ? "default" : "outline"} aria-pressed={edicion} onClick={alternarEdicion}>
-          <PencilIcon /> {edicion ? "Listo" : "Anotar"}
-        </Button>
+        {puedeAnotar && edicion && hayCambios && (
+          <Button className="h-11 px-4" variant="outline" disabled={guardando} onClick={descartarCambios}>
+            <XIcon /> Descartar
+          </Button>
+        )}
+        {puedeAnotar && (
+          <Button
+            className="h-11 px-4"
+            variant={edicion ? "default" : "outline"}
+            aria-pressed={edicion}
+            disabled={guardando}
+            onClick={edicion ? () => void terminarEdicion() : empezarEdicion}
+          >
+            {guardando ? <LoadingDots /> : <PencilIcon />} {edicion ? "Listo" : "Anotar"}
+          </Button>
+        )}
       </header>
 
-      {edicion && (
+      {puedeAnotar && edicion && (
         <BarraAnotaciones
           herramienta={herramienta}
           onHerramienta={elegirHerramienta}
@@ -378,11 +427,13 @@ export function HojaCorteVisor({
           onNivel={setNivel}
           puedeDeshacer={puedeDeshacer}
           onDeshacer={deshacer}
+          puedeEliminar={puedeEliminarAnotaciones}
         />
       )}
       <NotasDocumento
         notas={notas}
-        edicion={edicion}
+        edicion={puedeAnotar && edicion}
+        puedeBorrar={puedeEliminarAnotaciones}
         onCrear={(texto) => void crear({ tipo: "TEXTO", pagina: null, datos: { texto } })}
         onBorrar={(id) => void borrar(id)}
       />
@@ -408,7 +459,7 @@ export function HojaCorteVisor({
                 aspect={aspect}
                 scrollRoot={scrollRoot}
                 anotaciones={porPagina.get(i + 1) ?? SIN_ANOTACIONES}
-                herramienta={edicion ? herramienta : "mover"}
+                herramienta={puedeAnotar && edicion ? herramienta : "mover"}
                 color={color}
                 nivel={nivel}
                 onCrear={(a) => void crear(a)}

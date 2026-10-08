@@ -13,7 +13,15 @@ import {
 
 const fecha = new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" });
 
-function FilaDocumento({ pedidoId, doc }: { pedidoId: string; doc: DocumentoPedido }) {
+function FilaDocumento({
+  pedidoId,
+  doc,
+  puedeGestionar,
+}: {
+  pedidoId: string;
+  doc: DocumentoPedido;
+  puedeGestionar: boolean;
+}) {
   return (
     <li className="flex flex-wrap items-center gap-3 rounded-lg border bg-background p-3">
       <FileTextIcon className="size-5 shrink-0 text-muted-foreground" />
@@ -29,7 +37,7 @@ function FilaDocumento({ pedidoId, doc }: { pedidoId: string; doc: DocumentoPedi
       >
         Abrir
       </Link>
-      <DocumentoEliminar documento={doc} />
+      {puedeGestionar && <DocumentoEliminar documento={doc} />}
     </li>
   );
 }
@@ -40,10 +48,13 @@ export function DocumentacionPedido({
   pedidoId,
   codigoPedido,
   documentos,
+  puedeGestionar,
 }: {
   pedidoId: string;
   codigoPedido: string;
   documentos: DocumentoPedido[];
+  /** Subir y eliminar documentos (permiso documentacion.gestionar). */
+  puedeGestionar: boolean;
 }) {
   const de = (t: TipoDocumento) => documentos.filter((d) => d.tipo === t);
   const adicionales = documentos.filter((d) => TIPOS_ADICIONALES.includes(d.tipo));
@@ -70,11 +81,11 @@ export function DocumentacionPedido({
               {docs.length > 0 && (
                 <ul className="flex flex-col gap-2">
                   {docs.map((d) => (
-                    <FilaDocumento key={d.id} pedidoId={pedidoId} doc={d} />
+                    <FilaDocumento key={d.id} pedidoId={pedidoId} doc={d} puedeGestionar={puedeGestionar} />
                   ))}
                 </ul>
               )}
-              <DocumentoSubir pedidoId={pedidoId} codigoPedido={codigoPedido} tipos={[tipo]} />
+              {puedeGestionar && <DocumentoSubir pedidoId={pedidoId} codigoPedido={codigoPedido} tipos={[tipo]} />}
             </div>
           );
         })}
@@ -95,14 +106,14 @@ export function DocumentacionPedido({
                 <div className="text-sm font-medium">{ETIQUETA_TIPO[t]}</div>
                 <ul className="flex flex-col gap-2">
                   {de(t).map((d) => (
-                    <FilaDocumento key={d.id} pedidoId={pedidoId} doc={d} />
+                    <FilaDocumento key={d.id} pedidoId={pedidoId} doc={d} puedeGestionar={puedeGestionar} />
                   ))}
                 </ul>
               </div>
             ))}
           </div>
         )}
-        <DocumentoSubir pedidoId={pedidoId} codigoPedido={codigoPedido} tipos={TIPOS_ADICIONALES} />
+        {puedeGestionar && <DocumentoSubir pedidoId={pedidoId} codigoPedido={codigoPedido} tipos={TIPOS_ADICIONALES} />}
       </div>
     </section>
   );

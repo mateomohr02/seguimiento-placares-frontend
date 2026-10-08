@@ -11,11 +11,14 @@ import type { AnotacionNota } from "../types/anotacion.types";
 export function NotasDocumento({
   notas,
   edicion,
+  puedeBorrar,
   onCrear,
   onBorrar,
 }: {
   notas: AnotacionNota[];
   edicion: boolean;
+  /** Borrar notas ya guardadas (permiso documentacion.anotaciones.eliminar). Las de esta sesión siempre se pueden quitar. */
+  puedeBorrar: boolean;
   onCrear: (texto: string) => void;
   onBorrar: (id: string) => void;
 }) {
@@ -37,7 +40,7 @@ export function NotasDocumento({
             <li key={n.id} className="flex items-start gap-2">
               <StickyNoteIcon className="mt-1 size-4 shrink-0" />
               <span className="min-w-0 flex-1 break-words font-medium">{n.datos.texto}</span>
-              {edicion && (
+              {edicion && (puedeBorrar || n.id.startsWith("tmp-")) && (
                 <button
                   type="button"
                   aria-label="Borrar nota"

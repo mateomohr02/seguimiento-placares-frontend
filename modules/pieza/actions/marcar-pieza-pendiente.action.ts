@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api/api-client";
 
 export type MarcarPiezaPendienteResult = { success: true } | { success: false; message: string };
@@ -13,6 +14,7 @@ export async function marcarPiezaPendienteAction(piezaId: string): Promise<Marca
     revalidatePath("/", "layout");
     return { success: true };
   } catch (err) {
+    unstable_rethrow(err); // deja pasar el redirect al login (sesión vencida)
     const message = err instanceof ApiError ? err.message : "Error inesperado al pasar la pieza a Pendiente.";
     return { success: false, message };
   }

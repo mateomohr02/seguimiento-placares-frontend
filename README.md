@@ -59,7 +59,8 @@ app/frontend/
 │   ├── pieza/
 │   ├── hoja-corte/                # Visor de PDF/imágenes (hoja-corte-visor.tsx), capa de anotaciones, barra de herramientas, hook use-anotaciones. Lo reutilizan documentos y planos
 │   ├── documento-pedido/          # Documentación del pedido: tipos, carga con verificación (lib/analizar-pdf.ts), listado
-│   └── plano-pedido/              # Planos del pedido: carga, miniaturas, listado
+│   ├── plano-pedido/              # Planos del pedido: carga, miniaturas, listado
+│   └── auth/                       # Login por PIN: acción de login/logout y pantalla con teclado numérico
 ├── components/
 │   ├── ui/                       # Componentes genéricos de shadcn/ui (botón, tabla, diálogo...) sin lógica de negocio
 │   ├── estado-badge.tsx           # La "etiqueta" de color del estado: Pendiente (outline blanco), En proceso/En producción (bronce), Finalizado/Cortada/Lista (verde)
@@ -67,8 +68,11 @@ app/frontend/
 │   ├── column-filter.tsx           # Filtro de columna estilo Excel (lista de valores con checkbox + búsqueda)
 │   ├── network-guard.tsx           # Comprobador de red: cubre la app con un aviso si el dispositivo no llega al servidor
 │   └── loading-dots.tsx            # Tres puntos que crecen y se achican (carga de páginas y botones)
-├── lib/api/api-client.ts          # El único lugar del código del *servidor* que hace fetch() hacia el backend (JSON)
-├── lib/api/proxy-json.ts          # Reenvía pedidos JSON del navegador al backend (anotaciones)
+├── proxy.ts                        # Puerta de entrada: sin sesión vigente, todo redirige a /login (salvo /login y /red/estado)
+├── app/login/page.tsx              # Pantalla de PIN
+├── lib/api/api-client.ts          # El único lugar del código del *servidor* que hace fetch() hacia el backend (JSON). Reenvía el token de sesión; un 401 redirige a /login
+├── lib/api/proxy-json.ts          # Reenvía pedidos JSON del navegador al backend (anotaciones), con el token de sesión
+├── lib/auth/                       # permisos.ts (claves de permiso y `puede()`), sesion.ts (cookie, getSesion, requireSesion, authHeaders)
 ├── lib/pdfjs.ts                   # Carga perezosa de pdf.js (solo en el navegador) y su worker
 └── .env.local / .env.example
 ```
@@ -85,7 +89,7 @@ Dentro de cada `modules/<algo>/` vas a encontrar siempre:
 
 Las tablas con acciones tienen un componente `*-acciones.tsx` (`orden-acciones`: archivar y eliminar; `pieza-acciones`: finalizar y volver a pendiente) con los botones de su fila; todos se construyen con `ConfirmActionButton`. Módulos y pedidos son de solo lectura.
 
-**Regla importante**: ningún componente llama al backend directamente — del lado del servidor todo pasa por `lib/api/api-client.ts` o por una `action`. Eso hace que, si el día de mañana cambia cómo se llama al backend (por ejemplo, se agrega autenticación), solo hay que tocar un lugar.
+**Regla importante**: ningún componente llama al backend directamente — del lado del servidor todo pasa por `lib/api/api-client.ts` o por una `action`. Eso hace que, si el día de mañana cambia cómo se llama al backend, solo hay que tocar un lugar (la autenticación por PIN ya se resolvió ahí: `api-client.ts` agrega el token de la sesión).
 
 **Excepción deliberada (documentación digital)**: el navegador necesita pedir PDFs/imágenes y guardar anotaciones sin pasar por un Server Action (los Server Actions limitan el cuerpo a 1 MB y los archivos pesan más). Para eso hay *route handlers* de Next.js (`app/hojas-corte/…`, `app/documentos-pedido/…`, `app/planos-pedido/…` y los `subir/route.ts`) que actúan de **proxy**: el navegador le habla al frontend por `fetch('/…')` y el frontend le habla al backend. El backend nunca se expone directo (Caddy solo publica el frontend). Si algún día se agrega autenticación, esos route handlers son el segundo lugar a tocar.
 
@@ -99,7 +103,7 @@ Copiá `.env.example` a `.env.local` y completá:
 |---|---|---|
 | `API_URL` | Dónde está el backend | `http://localhost:4000/api` |
 
-Este proyecto no tiene login todavía, así que no hay nada más que configurar acá. `API_URL` **no** lleva el prefijo `NEXT_PUBLIC_` a propósito: solo se usa del lado del servidor (páginas y Server Actions), nunca desde el navegador — así el backend no queda expuesto directamente a quien abra las herramientas de desarrollador del navegador.
+El login (PIN) no necesita variables acá: la clave de sesión (`SESSION_SECRET`) vive solo en el `.env` del backend. `API_URL` **no** lleva el prefijo `NEXT_PUBLIC_` a propósito: solo se usa del lado del servidor (páginas y Server Actions), nunca desde el navegador — así el backend no queda expuesto directamente a quien abra las herramientas de desarrollador del navegador.
 
 ---
 
@@ -231,6 +235,20 @@ Entrá por `https://192.168.3.NNN/`. Como el certificado es autofirmado y ahora 
 
 ## Manual de usuario, vista por vista
 
+### Ingreso con PIN y roles
+
+Al abrir la app aparece la pantalla de **PIN** (teclado numérico en pantalla; con teclado físico también sirve, con Enter para ingresar). El PIN identifica al usuario: una persona o una estación de trabajo (`rover1`, `cortadora1`, …). Con un PIN incorrecto avisa y limpia el campo; tras 8 errores seguidos se bloquea unos minutos.
+
+- La sesión dura **12 horas** (configurable en el backend) y se guarda en una cookie que el navegador no puede leer. Arriba a la derecha del listado de órdenes se ve **quién está conectado y su rol**, con el botón **Salir**. Si la sesión vence, o si dan de baja al usuario mientras la usa, la app lo manda otra vez al ingreso de PIN.
+- Los usuarios, roles y permisos **se administran en la base** (ver el [README del backend](../backend/README.md#9-usuarios-roles-y-permisos)); no hay pantalla de administración.
+- **La app muestra solo lo que el rol puede hacer** (y el backend lo vuelve a validar en cada acción):
+
+| Rol | Qué ve y qué puede hacer |
+|---|---|
+| `admin` / `tecnica` | Todo: agregar, archivar y eliminar órdenes; escanear y marcar piezas; subir y eliminar documentación; anotar y borrar anotaciones |
+| `fabrica` (estaciones) | Ver órdenes, pedidos, módulos, despieces y documentación; **Escanear** y **Finalizado / Pendiente** por pieza; **anotar** sobre los documentos (puede deshacer lo que anota en esa sesión, pero **no** borrar anotaciones ya guardadas). No ve "Agregar orden", Archivar ni Eliminar, ni subir/eliminar documentos |
+| `gerencia` | Solo lectura: no ve "Escanear" (entrar a `/escaneo` lo devuelve al listado), ni botones de piezas, ni "Anotar", ni subir/eliminar |
+
 ### Aviso de red
 
 La app exige que el dispositivo esté en la red de Neostone SA. Como un navegador no puede leer el nombre del Wi-Fi, lo que se comprueba es que el servidor sea alcanzable: cada 5 segundos la app consulta `/red/estado`, y tras 2 fallos seguidos cubre toda la pantalla con un aviso hasta que vuelva la conexión (se recupera sola):
@@ -335,16 +353,16 @@ Si el PDF no tiene texto (un escaneo) no se puede verificar y se deja pasar. Los
 Se abre con **Abrir**. Muestra todas las hojas en una columna con scroll; solo dibuja las cercanas a la pantalla (una orden puede tener 80 hojas).
 
 - **Arriba**: Volver, título, número de hoja (se puede escribir un número y Enter para saltar), zoom − / + (50 % a 300 %), "ajustar al ancho" y **Anotar**.
-- Las anotaciones siempre se **ven**; solo se pueden crear tocando **Anotar** (así el operario no dibuja sin querer). **Listo** vuelve al modo lectura.
-- **Herramientas** (modo Anotar): **Mover** (scroll y zoom con normalidad), **Lápiz**, **Resaltador** (translúcido), **Texto** (tocá un lugar, escribí y Enter), **Borrar** (tocá una anotación para quitarla) y **Deshacer** (quita lo último que anotó *este* dispositivo). Cuatro colores y tres grosores. Con Lápiz o Resaltador el dedo **dibuja** (no scrollea): para moverte, pasá a "Mover".
+- Las anotaciones siempre se **ven**; solo se pueden crear tocando **Anotar** (así el operario no dibuja sin querer). Lo que se anota **no se guarda al instante**: queda en la pantalla hasta tocar **Listo**, que guarda todo y vuelve al modo lectura. **Descartar** (aparece si hay cambios) tira lo no guardado; si hay cambios sin guardar, **Volver** y cerrar la pestaña avisan antes de perderlos.
+- **Herramientas** (modo Anotar): **Mover** (scroll y zoom con normalidad), **Lápiz**, **Resaltador** (translúcido), **Texto** (tocá un lugar, escribí y Enter), **Borrar** (tocá una anotación para quitarla) y **Deshacer** (revierte, paso a paso, lo que se hizo *en esta sesión de edición*: nunca toca lo que ya estaba guardado). Cuatro colores y tres grosores. Con Lápiz o Resaltador el dedo **dibuja** (no scrollea): para moverte, pasá a "Mover".
 - **Notas del documento**: en modo Anotar se pueden agregar notas que valen para todo el documento (ej. "Págs. 77 a 80: MDF, bajan aparte"). Se muestran **siempre**, en una franja amarilla arriba.
-- **Varias tablets**: las anotaciones se guardan en el servidor al instante y cada visor abierto se refresca cada 20 segundos.
+- **Varias tablets**: las anotaciones se guardan en el servidor al tocar **Listo** y cada visor abierto se refresca cada 20 segundos (lo que otro dispositivo todavía no guardó no se ve).
 - El archivo original **nunca se modifica**: las anotaciones se dibujan encima. Se guardan con coordenadas relativas al tamaño de la página (se ven igual con cualquier zoom o dispositivo).
-- Todavía no hay usuarios: no se registra quién anota y cualquiera puede borrar.
+- **Permisos**: el botón **Anotar** solo aparece con el permiso `documentacion.anotar` (admin, tecnica y fabrica); **Borrar** (la herramienta y la X de las notas) sobre anotaciones **ya guardadas**, solo con `documentacion.anotaciones.eliminar` (admin y tecnica); esos borrados también se aplican recién al tocar **Listo** y se pueden deshacer antes. **Deshacer** lo tienen todos los que pueden anotar, pero solo sobre cambios de la sesión en curso. Subir y eliminar documentos requiere `documentacion.gestionar`. Gerencia solo ve. No se registra quién anotó.
 
 ### Para quien programa
 
-- `modules/hoja-corte/components/hoja-corte-visor.tsx` es **el visor de todos los documentos** (a pesar del nombre): recibe `src`, `anotacionesUrl` y `tipoArchivo` (`"pdf"` por defecto, `"imagen"` para planos).
+- `modules/hoja-corte/components/hoja-corte-visor.tsx` es **el visor de todos los documentos** (a pesar del nombre): recibe `src`, `anotacionesUrl`, `tipoArchivo` (`"pdf"` por defecto, `"imagen"` para planos) y los permisos `puedeAnotar` / `puedeEliminarAnotaciones` (ambos `false` por defecto: sin ellos el visor es de solo lectura). Cada página que lo usa los calcula con `puede(sesion, PERMISOS.…)`.
 - Las anotaciones usan `hooks/use-anotaciones.ts` (altas y bajas optimistas con reversión, refresco periódico) y se dibujan en una capa SVG por página (`anotaciones-capa.tsx`).
 - Para sumar otro tipo de documento: tabla + rutas en el backend, route handlers proxy, y reutilizar el visor pasándole su `anotacionesUrl`.
 
@@ -374,5 +392,8 @@ Los tokens de color están en [`app/globals.css`](app/globals.css) (variables `-
 | El certificado de HTTPS no es de confianza | Es autofirmado, a propósito (no hace falta pagar/gestionar un certificado público para una red interna) | Aceptar el aviso del navegador una vez por dispositivo |
 | El visor muestra solo tres puntos y no abre la hoja | El PDF no llegó o el navegador es muy viejo para pdf.js | Recargar; si el aviso dice "No se pudo abrir la hoja de corte", revisar que el backend esté corriendo. En desarrollo (`npm run dev`), la **primera** carga del visor tarda porque compila pdf.js; en producción abre en menos de un segundo |
 | Subir un PDF falla con "Este PDF es del pedido X…" / "parece ser …" | Se está cargando en el pedido o tipo equivocado (es la verificación funcionando) | Subirlo donde corresponde, o elegir el tipo correcto |
+| La app siempre vuelve a la pantalla de PIN | La sesión venció (12 h), el usuario fue dado de baja, se cambió `SESSION_SECRET` en el backend, o el navegador bloquea cookies | Volver a ingresar el PIN; si se repite, verificar que el usuario esté `activo` en la base y que el backend esté corriendo |
+| "PIN incorrecto" con un PIN que debería andar | El usuario no existe, está `activo = false`, o el PIN cargado en la tabla `usuario` es otro | Revisar la fila del usuario en la base (ver el README del backend) |
+| Un botón no aparece o la app responde "No tenés permiso" | El rol del usuario no incluye ese permiso (es lo esperado) | Revisar la tabla de roles de [Ingreso con PIN y roles](#ingreso-con-pin-y-roles); los permisos se editan en la tabla `rol_permiso` del backend |
 | Una anotación hecha en otra tablet no aparece | El visor se refresca cada 20 segundos | Esperar unos segundos o recargar la página |
 | Una tabla se corta a la derecha (scroll horizontal) en una pantalla angosta | Con la letra más grande, la tabla de piezas (9 columnas) necesita más de ~800 px | Es esperado en pantallas chicas; en desktop/tablet horizontal entra. Las páginas usan `max-w-6xl` |

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api/api-client";
 import type { Orden } from "../types/orden.types";
 
@@ -21,6 +22,7 @@ export async function archivarOrdenAction(
     revalidatePath("/", "layout");
     return { success: true, orden };
   } catch (err) {
+    unstable_rethrow(err); // deja pasar el redirect al login (sesión vencida)
     const message = err instanceof ApiError ? err.message : "Error inesperado al archivar la orden.";
     return { success: false, message };
   }

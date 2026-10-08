@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api/api-client";
 import { EscanearPiezaSchema } from "../schemas/escanear-pieza.schema";
 import type { EscaneoResumen } from "../types/pieza.types";
@@ -26,6 +27,7 @@ export async function escanearPiezaAction(input: unknown): Promise<EscanearPieza
     revalidatePath("/", "layout");
     return { success: true, resumen };
   } catch (err) {
+    unstable_rethrow(err); // deja pasar el redirect al login (sesión vencida)
     const message = err instanceof ApiError ? err.message : "Error inesperado al escanear la pieza.";
     return { success: false, message };
   }

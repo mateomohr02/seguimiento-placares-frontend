@@ -13,10 +13,13 @@ export function PlanosPedido({
   pedidoId,
   planos,
   modulos,
+  puedeGestionar,
 }: {
   pedidoId: string;
   planos: PlanoPedido[];
   modulos: { id: string; idEscena: number; descripcion: string }[];
+  /** Subir y eliminar planos (permiso documentacion.gestionar). */
+  puedeGestionar: boolean;
 }) {
   return (
     <section id="planos" className="flex scroll-mt-20 flex-col gap-4">
@@ -59,13 +62,13 @@ export function PlanosPedido({
                   >
                     Abrir
                   </Link>
-                  <PlanoEliminar plano={p} />
+                  {puedeGestionar && <PlanoEliminar plano={p} />}
                 </div>
               </li>
             ))}
           </ul>
         )}
-        <PlanoSubir pedidoId={pedidoId} modulos={modulos} />
+        {puedeGestionar && <PlanoSubir pedidoId={pedidoId} modulos={modulos} />}
       </div>
     </section>
   );

@@ -1,7 +1,10 @@
 // Cliente de API centralizado — ningún componente/action llama fetch() directo.
-// La app todavía no tiene sesión/autenticación (diseño.md §8.2: no hay modelo
-// Usuario en el MVP), así que este cliente no maneja cookies httpOnly todavía;
-// cuando se agregue auth, es el único lugar que hay que tocar.
+// Reenvía el token de la sesión (cookie httpOnly, diseño.md §12) como Authorization.
+// Si el backend responde 401 (sesión vencida o usuario dado de baja) se redirige
+// al login. Un 403 llega como ApiError con el motivo.
+import { redirect } from "next/navigation";
+import { authHeaders } from "@/lib/auth/sesion";
+
 const API_URL = process.env.API_URL ?? "http://localhost:4000/api";
 
 interface ApiEnvelope<T> {
@@ -10,7 +13,14 @@ interface ApiEnvelope<T> {
   data: T;
 }
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
 
 export async function apiFetch<TResponse>(
   endpoint: string,
@@ -18,15 +28,17 @@ export async function apiFetch<TResponse>(
 ): Promise<TResponse> {
   const res = await fetch(`${API_URL}${endpoint}`, {
     method: options.method ?? "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     cache: "no-store",
   });
 
   const envelope = (await res.json()) as ApiEnvelope<TResponse>;
 
+  if (res.status === 401) redirect("/login");
+
   if (!res.ok) {
-    throw new ApiError(envelope.message ?? "Error al comunicarse con la API.");
+    throw new ApiError(envelope.message ?? "Error al comunicarse con la API.", res.status);
   }
 
   return envelope.data;

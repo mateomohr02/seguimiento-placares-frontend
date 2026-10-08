@@ -26,7 +26,16 @@ const normalize = (s: string) =>
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase();
 
-export function OrdenesTable({ ordenes, archivadas }: { ordenes: Orden[]; archivadas: boolean }) {
+export function OrdenesTable({
+  ordenes,
+  archivadas,
+  puedeGestionar,
+}: {
+  ordenes: Orden[];
+  archivadas: boolean;
+  /** Archivar / eliminar órdenes (permiso ordenes.gestionar). */
+  puedeGestionar: boolean;
+}) {
   const [query, setQuery] = useState("");
 
   const filtradas = useMemo(() => {
@@ -50,7 +59,9 @@ export function OrdenesTable({ ordenes, archivadas }: { ordenes: Orden[]; archiv
       <p className="text-sm text-muted-foreground">
         {archivadas
           ? "No hay órdenes archivadas."
-          : 'No hay órdenes activas. Usá "Agregar orden" para sincronizar una desde TeoWin (o revisá las archivadas).'}
+          : puedeGestionar
+            ? 'No hay órdenes activas. Usá "Agregar orden" para sincronizar una desde TeoWin (o revisá las archivadas).'
+            : "No hay órdenes activas (o revisá las archivadas)."}
       </p>
     );
   }
@@ -114,7 +125,7 @@ export function OrdenesTable({ ordenes, archivadas }: { ordenes: Orden[]; archiv
                 <EstadoBadge estado={orden.estado} />
               </TableCell>
               <TableCell className="text-right">
-                <OrdenAcciones orden={orden} archivada={archivadas} />
+                {puedeGestionar && <OrdenAcciones orden={orden} archivada={archivadas} />}
               </TableCell>
             </TableRow>
           ))}
