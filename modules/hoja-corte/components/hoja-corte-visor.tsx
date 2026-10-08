@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { ArrowLeftIcon, MinusIcon, PencilIcon, PlusIcon, ScanIcon, XIcon } from "lucide-react";
+import { MinusIcon, PencilIcon, PlusIcon, ScanIcon, XIcon } from "lucide-react";
 import type { PDFDocumentProxy, PDFDocumentLoadingTask } from "pdfjs-dist/legacy/build/pdf.mjs";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { LoadingDots } from "@/components/loading-dots";
+import { VolverLink } from "@/components/volver-link";
 import { loadPdfjs } from "@/lib/pdfjs";
 import type { AnotacionNota, AnotacionPagina, Herramienta, NuevaAnotacion } from "../types/anotacion.types";
 import { CapaAnotaciones } from "./anotaciones-capa";
@@ -331,15 +331,13 @@ export function HojaCorteVisor({
   return (
     <div className="flex h-dvh flex-col bg-muted">
       <header className="flex flex-wrap items-center gap-2 border-b bg-background px-3 py-2">
-        <Link
+        <VolverLink
           href={volverHref}
+          grande
           onClick={(e) => {
             if (hayCambios && !window.confirm("Tenés anotaciones sin guardar. ¿Salir sin guardarlas?")) e.preventDefault();
           }}
-          className={buttonVariants({ variant: "outline", className: "h-11 px-4" })}
-        >
-          <ArrowLeftIcon /> Volver
-        </Link>
+        />
         <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{titulo}</h1>
 
         <div className="flex items-center gap-1">

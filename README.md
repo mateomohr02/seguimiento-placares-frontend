@@ -56,7 +56,7 @@ app/frontend/
 │   ├── orden/
 │   ├── pedido/
 │   ├── modulo/
-│   ├── pieza/
+│   ├── pieza/                     # Escaneo (escaner-camara.tsx), historial de la sesión (historial-escaneo.tsx + hooks/use-historial-escaneo.ts), tabla de piezas
 │   ├── hoja-corte/                # Visor de PDF/imágenes (hoja-corte-visor.tsx), capa de anotaciones, barra de herramientas, hook use-anotaciones. Lo reutilizan documentos y planos
 │   ├── documento-pedido/          # Documentación del pedido: tipos, carga con verificación (lib/analizar-pdf.ts), listado
 │   ├── plano-pedido/              # Planos del pedido: carga, miniaturas, listado
@@ -67,6 +67,7 @@ app/frontend/
 │   ├── confirm-action-button.tsx  # Botón + diálogo Aceptar/Cancelar. TODA acción que modifica datos pasa por acá (con `requireText`, además exige tipear una palabra)
 │   ├── column-filter.tsx           # Filtro de columna estilo Excel (lista de valores con checkbox + búsqueda)
 │   ├── network-guard.tsx           # Comprobador de red: cubre la app con un aviso si el dispositivo no llega al servidor
+│   ├── volver-link.tsx            # Botón "volver" único de la app (variantes claro, acento y vidrio); usarlo siempre en vez de links de texto
 │   └── loading-dots.tsx            # Tres puntos que crecen y se achican (carga de páginas y botones)
 ├── proxy.ts                        # Puerta de entrada: sin sesión vigente, todo redirige a /login (salvo /login y /red/estado)
 ├── app/login/page.tsx              # Pantalla de PIN
@@ -312,14 +313,17 @@ El detalle más fino: cada pieza física de ese módulo con **Código** (el de l
 
 ### Vista 5 — Escaneo (`/escaneo`)
 
-Pantalla completa pensada para tablet, con la cámara ocupando toda la pantalla ("modo continuo": no hay que tocar nada entre un escaneo y otro, la cámara queda siempre escuchando).
+Pantalla completa pensada para tablet: la cámara ocupa toda la pantalla y, a la derecha, un **sidebar transparente con el historial de la sesión** que se superpone a la imagen (las tarjetas tienen estilo "vidrio": translúcidas y desenfocadas, con un leve tinte verde o amarillo; la lista se desplaza con el dedo y la cámara sigue visible y activa entre tarjetas) ("modo continuo": no hay que tocar nada entre un escaneo y otro, la cámara queda siempre escuchando).
 
 - **Mira**: un rectángulo con esquinas marcadas y una línea de barrido, con el resto de la imagen atenuada, para apuntar el código de barras. Es solo una guía visual: el lector busca el código en todo el cuadro.
 - Apunta la cámara al código de barras de la etiqueta de corte (siempre 7 dígitos).
-- Al reconocer un código válido, aparece abajo un cartel con el resumen (orden, pedido, pieza, medidas, color, código y el módulo con su id entre paréntesis):
+- Al reconocer un código válido se agrega arriba del sidebar una **tarjeta** con el resumen (orden, pedido, pieza, medidas, color, código y el módulo con su id entre paréntesis). Hay **una tarjeta por pieza**: si se vuelve a escanear la misma, su tarjeta sube al principio con el resultado más reciente. El historial guarda hasta 100 piezas.
   - **Verde** ("Pieza registrada"): la pieza era nueva. Pasa a "Cortada", y si era la primera de ese módulo/pedido/orden, todos suben de "Pendiente" a "En producción" (o "En proceso" en la orden).
   - **Amarillo** ("Pieza ya escaneada anteriormente"): la pieza ya estaba cortada; no cambia nada.
-- Si el código no corresponde a ninguna pieza (o pertenece a una orden eliminada), aparece un cartel de error en vez del resumen — la cámara sigue funcionando, no hay que reiniciar nada.
+- **Tocar una tarjeta** lleva al despiece del módulo (Vista 4) con esa pieza **resaltada y centrada** en la tabla; en esa pantalla, "← Volver al escaneo" regresa a la cámara y el historial sigue ahí.
+- **El historial dura lo que dura la sesión de login** y vive solo en el navegador del dispositivo (no se guarda en la base). Se borra al **cerrar sesión (Salir)**, al **iniciar sesión de nuevo** (otra sesión no hereda el historial) y cuando la sesión **vence** (12 h; si la pantalla está abierta se limpia en el momento). Recargar la página o cerrar la pestaña **no** lo borra mientras la sesión siga vigente.
+- **En pantallas angostas** (menos de 768 px, ej. tablet vertical) el sidebar es un panel que se abre con el botón **"Escaneadas (N)"** (arriba a la derecha), que toma el color del último escaneo (verde o amarillo).
+- Si el código no corresponde a ninguna pieza (o pertenece a una orden eliminada), aparece un cartel de error arriba de la cámara (no se agrega tarjeta) — la cámara sigue funcionando, no hay que reiniciar nada. Si la cámara no se puede usar, el aviso reemplaza a la cámara pero el sidebar sigue visible.
 - **Botón "Volver"** (esquina superior izquierda, siempre visible sobre la imagen de la cámara): vuelve a la Vista 1.
 
 ---

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { apiFetch } from "@/lib/api/api-client";
+import { VolverLink } from "@/components/volver-link";
 import { requireSesion } from "@/lib/auth/sesion";
 import { PERMISOS, puede } from "@/lib/auth/permisos";
 import type { Orden } from "@/modules/orden/types/orden.types";
@@ -19,10 +19,8 @@ export default async function HojasCortePage({ params }: { params: Promise<{ id:
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10">
       <div>
-        <Link href={`/ordenes/${id}`} className="text-sm text-muted-foreground hover:underline">
-          ← Orden {orden.numeroOrdenCustom}
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold">
+        <VolverLink href={`/ordenes/${id}`}>Orden {orden.numeroOrdenCustom}</VolverLink>
+        <h1 className="mt-3 text-xl font-semibold">
           Hojas de corte — Orden {orden.numeroOrdenCustom} — {orden.descripcion}
         </h1>
       </div>

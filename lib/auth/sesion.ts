@@ -41,3 +41,22 @@ export async function requireSesion(): Promise<Sesion> {
   if (!sesion) redirect("/login");
   return sesion;
 }
+
+// Identidad de la sesión actual para datos que viven en el navegador y deben morir
+// con ella (ej. el historial de escaneo): `uid:vencimiento` sale del payload del
+// token (no es secreto, a diferencia de la firma, que nunca sale del servidor). Un
+// login nuevo cambia el vencimiento, así que cambia la clave; `expiraEn` va en ms.
+export async function getClaveSesion(): Promise<{ clave: string; expiraEn: number } | null> {
+  const token = await getToken();
+  if (!token) return null;
+  try {
+    const { uid, exp } = JSON.parse(Buffer.from(token.split(".")[0], "base64url").toString("utf8")) as {
+      uid?: string;
+      exp?: number;
+    };
+    if (typeof uid !== "string" || typeof exp !== "number") return null;
+    return { clave: `${uid}:${exp}`, expiraEn: exp * 1000 };
+  } catch {
+    return null;
+  }
+}
