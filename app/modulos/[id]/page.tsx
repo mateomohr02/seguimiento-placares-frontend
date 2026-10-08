@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { apiFetch } from "@/lib/api/api-client";
+import { VolverLink } from "@/components/volver-link";
 import { requireSesion } from "@/lib/auth/sesion";
 import { PERMISOS, puede } from "@/lib/auth/permisos";
 import { PiezasTable } from "@/modules/pieza/components/piezas-table";
@@ -25,17 +25,15 @@ export default async function ModuloDetallePage({
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10">
       <div>
-        <div className="flex items-center gap-4">
-          <Link href={`/pedidos/${modulo.pedido.id}`} className="text-sm text-muted-foreground hover:underline">
-            ← Pedido {modulo.pedido.codigo_pedido}
-          </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <VolverLink href={`/pedidos/${modulo.pedido.id}`}>Pedido {modulo.pedido.codigo_pedido}</VolverLink>
           {piezaId && (
-            <Link href="/escaneo" className="text-sm text-muted-foreground hover:underline">
-              ← Volver al escaneo
-            </Link>
+            <VolverLink href="/escaneo" variante="acento">
+              Volver al escaneo
+            </VolverLink>
           )}
         </div>
-        <div className="mt-2 flex items-center gap-3">
+        <div className="mt-3 flex items-center gap-3">
           <h1 className="text-xl font-semibold">
             Módulo {modulo.idEscena} — {modulo.descripcion}
           </h1>

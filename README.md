@@ -67,6 +67,7 @@ app/frontend/
 │   ├── confirm-action-button.tsx  # Botón + diálogo Aceptar/Cancelar. TODA acción que modifica datos pasa por acá (con `requireText`, además exige tipear una palabra)
 │   ├── column-filter.tsx           # Filtro de columna estilo Excel (lista de valores con checkbox + búsqueda)
 │   ├── network-guard.tsx           # Comprobador de red: cubre la app con un aviso si el dispositivo no llega al servidor
+│   ├── volver-link.tsx            # Botón "volver" único de la app (variantes claro, acento y vidrio); usarlo siempre en vez de links de texto
 │   └── loading-dots.tsx            # Tres puntos que crecen y se achican (carga de páginas y botones)
 ├── proxy.ts                        # Puerta de entrada: sin sesión vigente, todo redirige a /login (salvo /login y /red/estado)
 ├── app/login/page.tsx              # Pantalla de PIN

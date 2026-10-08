@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { cn } from "cn";
-import { ArrowLeftIcon, ListIcon, XIcon } from "lucide-react";
+import { ListIcon, XIcon } from "lucide-react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType, NotFoundException } from "@zxing/library";
 import type { IScannerControls } from "@zxing/browser";
 import { escanearPiezaAction } from "../actions/escanear-pieza.action";
+import { VolverLink } from "@/components/volver-link";
 import { useHistorialEscaneo } from "../hooks/use-historial-escaneo";
 import { HistorialEscaneo } from "./historial-escaneo";
 
@@ -16,19 +16,10 @@ import { HistorialEscaneo } from "./historial-escaneo";
 // con un cooldown corto, en vez de exigir que el operario lo saque de foco.
 const COOLDOWN_MS = 3000;
 
-// Flotante y con fondo propio: tiene que verse siempre arriba de la imagen de
-// cámara (o de cualquier pantalla de error), es la única forma de salir de
-// Vista 5.
+// Flotante, en vidrio (translúcido): tiene que verse siempre arriba de la imagen de
+// cámara (o de cualquier pantalla de error), es la única forma de salir de Vista 5.
 function BotonVolver() {
-  return (
-    <Link
-      href="/"
-      className="absolute top-4 left-4 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-2 text-sm font-medium text-white backdrop-blur hover:bg-black/75"
-    >
-      <ArrowLeftIcon className="size-4" />
-      Volver
-    </Link>
-  );
+  return <VolverLink href="/" variante="vidrio" className="absolute top-4 left-4 z-10" />;
 }
 
 export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; expiraEn: number }) {
