@@ -1,6 +1,6 @@
 # Frontend — Seguimiento de placares
 
-La interfaz web que usan **logística** (ver el progreso de las órdenes) y el **operario de la máquina Rover** (escanear piezas cortadas). Habla con el [backend](../backend/README.md) por HTTP — nunca accede a TeoWin ni a la base de datos directamente.
+La interfaz web que usan **logística** (ver el progreso de las órdenes) y el **operario de la máquina Rover** (escanear piezas cortadas). Habla con el [backend](../backend/README.md) por HTTP — nunca accede a TeoWin ni a la base de datos directamente. Además de seguir la producción, sirve para **consultar y anotar la documentación digital**: hojas de corte por orden, y nota de pedido, remisión, listados y planos por pedido.
 
 > Si nunca tocaste este proyecto, empezá por **"Cómo levantarlo"**. El resto es referencia.
 
@@ -14,8 +14,9 @@ La interfaz web que usan **logística** (ver el progreso de las órdenes) y el *
 4. [Cómo levantarlo](#cómo-levantarlo)
 5. [Cámara y HTTPS — por qué hace falta Caddy](#cámara-y-https--por-qué-hace-falta-caddy)
 6. [Manual de usuario, vista por vista](#manual-de-usuario-vista-por-vista)
-7. [Diseño visual](#diseño-visual)
-8. [Problemas comunes](#problemas-comunes)
+7. [Documentación digital y anotaciones](#documentación-digital-y-anotaciones)
+8. [Diseño visual](#diseño-visual)
+9. [Problemas comunes](#problemas-comunes)
 
 ---
 
@@ -28,6 +29,7 @@ La interfaz web que usan **logística** (ver el progreso de las órdenes) y el *
 | **shadcn/ui** | Componentes de interfaz (botones, tablas, diálogos) ya armados | No hay que reinventar cada componente visual desde cero |
 | **Tailwind CSS** | Estilos por clases utilitarias | Rápido de escribir y de mantener consistente |
 | **React Hook Form + Zod** | Formularios y su validación | Un solo lugar define qué es un dato válido |
+| **pdfjs-dist** (pdf.js) | Dibuja los PDF en la pantalla (en un `<canvas>`) | Los navegadores de las tablets no muestran PDFs embebidos de forma confiable (iOS Safari solo la primera hoja, Android Chrome ninguna). Se usa la build *legacy* para que funcione en navegadores viejos |
 | **@zxing/browser** | Lectura de códigos de barras usando la cámara del navegador | Es lo que permite escanear sin un lector físico dedicado |
 | **Caddy** | Servidor que agrega HTTPS por delante de esta app | La cámara del navegador **no funciona sin HTTPS** — ver la sección dedicada más abajo |
 
@@ -43,6 +45,10 @@ app/frontend/
 │   ├── pedidos/[id]/page.tsx     # "/pedidos/<uuid>"  → Vista 3: módulos de un pedido
 │   ├── modulos/[id]/page.tsx     # "/modulos/<uuid>"  → Vista 4: piezas de un módulo
 │   ├── escaneo/page.tsx          # "/escaneo"      → Vista 5: cámara para escanear
+│   ├── ordenes/[id]/hojas-corte/  # Hojas de corte: lista + carga (page.tsx), visor ([hojaId]/page.tsx) y proxy de subida (subir/route.ts)
+│   ├── pedidos/[id]/documentos/[docId]/page.tsx  # Visor de un documento del pedido (+ documentos/subir/route.ts, proxy de subida)
+│   ├── pedidos/[id]/planos/[planoId]/page.tsx    # Visor de un plano (+ planos/subir/route.ts)
+│   ├── hojas-corte/[id]/ · documentos-pedido/[id]/ · planos-pedido/[id]/   # Route handlers: proxys de /archivo y /anotaciones hacia el backend (el navegador no habla con el backend)
 │   ├── red/estado/route.ts       # Endpoint que consulta el comprobador de red (responde si el frontend y el backend están vivos)
 │   ├── loading.tsx               # Pantalla de carga (tres puntos) mientras una página pide sus datos
 │   └── layout.tsx                # Estructura común a todas las páginas (fuente, tema, notificaciones)
@@ -50,7 +56,10 @@ app/frontend/
 │   ├── orden/
 │   ├── pedido/
 │   ├── modulo/
-│   └── pieza/
+│   ├── pieza/
+│   ├── hoja-corte/                # Visor de PDF/imágenes (hoja-corte-visor.tsx), capa de anotaciones, barra de herramientas, hook use-anotaciones. Lo reutilizan documentos y planos
+│   ├── documento-pedido/          # Documentación del pedido: tipos, carga con verificación (lib/analizar-pdf.ts), listado
+│   └── plano-pedido/              # Planos del pedido: carga, miniaturas, listado
 ├── components/
 │   ├── ui/                       # Componentes genéricos de shadcn/ui (botón, tabla, diálogo...) sin lógica de negocio
 │   ├── estado-badge.tsx           # La "etiqueta" de color del estado: Pendiente (outline blanco), En proceso/En producción (bronce), Finalizado/Cortada/Lista (verde)
@@ -58,7 +67,9 @@ app/frontend/
 │   ├── column-filter.tsx           # Filtro de columna estilo Excel (lista de valores con checkbox + búsqueda)
 │   ├── network-guard.tsx           # Comprobador de red: cubre la app con un aviso si el dispositivo no llega al servidor
 │   └── loading-dots.tsx            # Tres puntos que crecen y se achican (carga de páginas y botones)
-├── lib/api/api-client.ts          # El único lugar del código que hace fetch() hacia el backend
+├── lib/api/api-client.ts          # El único lugar del código del *servidor* que hace fetch() hacia el backend (JSON)
+├── lib/api/proxy-json.ts          # Reenvía pedidos JSON del navegador al backend (anotaciones)
+├── lib/pdfjs.ts                   # Carga perezosa de pdf.js (solo en el navegador) y su worker
 └── .env.local / .env.example
 ```
 
@@ -74,7 +85,9 @@ Dentro de cada `modules/<algo>/` vas a encontrar siempre:
 
 Las tablas con acciones tienen un componente `*-acciones.tsx` (`orden-acciones`: archivar y eliminar; `pieza-acciones`: finalizar y volver a pendiente) con los botones de su fila; todos se construyen con `ConfirmActionButton`. Módulos y pedidos son de solo lectura.
 
-**Regla importante**: ningún componente llama `fetch()` directamente — todo pasa por `lib/api/api-client.ts` o por una `action`. Eso hace que, si el día de mañana cambia cómo se llama al backend (por ejemplo, se agrega autenticación), solo hay que tocar un lugar.
+**Regla importante**: ningún componente llama al backend directamente — del lado del servidor todo pasa por `lib/api/api-client.ts` o por una `action`. Eso hace que, si el día de mañana cambia cómo se llama al backend (por ejemplo, se agrega autenticación), solo hay que tocar un lugar.
+
+**Excepción deliberada (documentación digital)**: el navegador necesita pedir PDFs/imágenes y guardar anotaciones sin pasar por un Server Action (los Server Actions limitan el cuerpo a 1 MB y los archivos pesan más). Para eso hay *route handlers* de Next.js (`app/hojas-corte/…`, `app/documentos-pedido/…`, `app/planos-pedido/…` y los `subir/route.ts`) que actúan de **proxy**: el navegador le habla al frontend por `fetch('/…')` y el frontend le habla al backend. El backend nunca se expone directo (Caddy solo publica el frontend). Si algún día se agrega autenticación, esos route handlers son el segundo lugar a tocar.
 
 ---
 
@@ -189,14 +202,18 @@ La pantalla principal. Muestra una tabla con las órdenes de fabricación sincro
 Los pedidos que forman parte de la orden seleccionada: número de pedido, cliente/referencia, cantidad de módulos y estado.
 
 - Click en el número de pedido o en el cliente → entra a la Vista 3 de ese pedido.
+- **Botón "Hojas de corte"** (arriba, junto al estado de la orden): lleva a la pantalla de hojas de corte de la orden (ver [Documentación digital](#documentación-digital-y-anotaciones)).
 - Solo lectura: el estado de cada pedido se calcula a partir de sus módulos. Cuando **todos** los pedidos de una orden quedan finalizados, la orden pasa sola a "Lista".
 
-### Vista 3 — Módulos de un pedido (`/pedidos/:id`)
+### Vista 3 — Detalle de un pedido (`/pedidos/:id`)
 
-Los módulos (muebles) de ese pedido: id, descripción, cantidad de tipos de pieza y estado.
+Tres secciones, con una **barra fija arriba** para saltar entre ellas (**Modulación**, **Documentación**, **Planos**; cada botón muestra su cantidad, resalta la sección que estás viendo, y la Documentación lleva un punto ámbar si falta la Nota de Pedido o el Detalle de Remisión):
 
-- Click en el id o en la descripción → entra a la Vista 4 de ese módulo.
-- Solo lectura: el estado de cada módulo se calcula a partir de sus piezas.
+- **Modulación**: los módulos (muebles) del pedido: id, descripción, cantidad de tipos de pieza y estado. Click en el id o en la descripción → Vista 4 de ese módulo. Solo lectura: el estado de cada módulo se calcula a partir de sus piezas.
+- **Documentación**: Nota de Pedido y Detalle de Remisión (obligatorios, se marca "Falta cargar" si no están) y documentación adicional (escandallo, herrajes, accesorios).
+- **Planos**: los planos del pedido (no todos los pedidos los llevan).
+
+Ver [Documentación digital](#documentación-digital-y-anotaciones).
 
 ### Vista 4 — Piezas de un módulo (`/modulos/:id`)
 
@@ -216,6 +233,50 @@ Pantalla completa pensada para tablet, con la cámara ocupando toda la pantalla 
   - **Amarillo** ("Pieza ya escaneada anteriormente"): la pieza ya estaba cortada; no cambia nada.
 - Si el código no corresponde a ninguna pieza (o pertenece a una orden eliminada), aparece un cartel de error en vez del resumen — la cámara sigue funcionando, no hay que reiniciar nada.
 - **Botón "Volver"** (esquina superior izquierda, siempre visible sobre la imagen de la cámara): vuelve a la Vista 1.
+
+---
+
+## Documentación digital y anotaciones
+
+Permite consultar en la tablet, y **anotar**, los documentos que antes bajaban en papel.
+
+### Dónde está cada cosa
+
+| Qué | Dónde | Cómo se carga |
+|---|---|---|
+| **Hojas de corte** (PDF) | Vista 2, botón "Hojas de corte" (`/ordenes/:id/hojas-corte`) | "Cargar hoja de corte": nombre + PDF. Una orden puede tener varias (ej. MDP y MDF, cada una con su nombre) |
+| **Nota de Pedido**, **Detalle de Remisión** (obligatorios) | Vista 3, sección Documentación | Botón "Subir" de cada tarjeta |
+| **Escandallo de Placares**, **Herrajes de Producción** y **Accesorios de Instalación** (Placares o Cocinas) | Vista 3, "Documentación adicional" | Se elige el tipo (se autoselecciona al reconocer el título del PDF) y se sube. Herrajes y accesorios de Placares y de Cocinas son tipos distintos porque salen de reportes distintos |
+| **Planos** (imagen JPG/PNG/WEBP o PDF) | Vista 3, sección Planos | Archivo + nombre + módulo (opcional) |
+
+Se pueden cargar varios del mismo tipo (ej. una remisión parcial), con un nombre opcional. Eliminar pide confirmación y es un borrado lógico (se puede volver a cargar).
+
+### Verificación al subir
+
+Antes de subir un PDF de TeoWin, la app lee su primera hoja y **bloquea** la carga si:
+
+- es de otra orden (hojas de corte: busca `Orden NNN`), o de otro pedido (documentos: busca el código `NN-NNNNN`), o
+- parece ser de otro tipo que el elegido (por el título: "Nota de Pedido", "Detalle de Remisión", "Escandallo", "Herrajes…", "Accesorios…", y "Placares"/"Cocinas").
+
+Si el PDF no tiene texto (un escaneo) no se puede verificar y se deja pasar. Los planos son imágenes: no se verifican.
+
+### El visor
+
+Se abre con **Abrir**. Muestra todas las hojas en una columna con scroll; solo dibuja las cercanas a la pantalla (una orden puede tener 80 hojas).
+
+- **Arriba**: Volver, título, número de hoja (se puede escribir un número y Enter para saltar), zoom − / + (50 % a 300 %), "ajustar al ancho" y **Anotar**.
+- Las anotaciones siempre se **ven**; solo se pueden crear tocando **Anotar** (así el operario no dibuja sin querer). **Listo** vuelve al modo lectura.
+- **Herramientas** (modo Anotar): **Mover** (scroll y zoom con normalidad), **Lápiz**, **Resaltador** (translúcido), **Texto** (tocá un lugar, escribí y Enter), **Borrar** (tocá una anotación para quitarla) y **Deshacer** (quita lo último que anotó *este* dispositivo). Cuatro colores y tres grosores. Con Lápiz o Resaltador el dedo **dibuja** (no scrollea): para moverte, pasá a "Mover".
+- **Notas del documento**: en modo Anotar se pueden agregar notas que valen para todo el documento (ej. "Págs. 77 a 80: MDF, bajan aparte"). Se muestran **siempre**, en una franja amarilla arriba.
+- **Varias tablets**: las anotaciones se guardan en el servidor al instante y cada visor abierto se refresca cada 20 segundos.
+- El archivo original **nunca se modifica**: las anotaciones se dibujan encima. Se guardan con coordenadas relativas al tamaño de la página (se ven igual con cualquier zoom o dispositivo).
+- Todavía no hay usuarios: no se registra quién anota y cualquiera puede borrar.
+
+### Para quien programa
+
+- `modules/hoja-corte/components/hoja-corte-visor.tsx` es **el visor de todos los documentos** (a pesar del nombre): recibe `src`, `anotacionesUrl` y `tipoArchivo` (`"pdf"` por defecto, `"imagen"` para planos).
+- Las anotaciones usan `hooks/use-anotaciones.ts` (altas y bajas optimistas con reversión, refresco periódico) y se dibujan en una capa SVG por página (`anotaciones-capa.tsx`).
+- Para sumar otro tipo de documento: tabla + rutas en el backend, route handlers proxy, y reutilizar el visor pasándole su `anotacionesUrl`.
 
 ---
 
@@ -241,4 +302,7 @@ Los tokens de color están en [`app/globals.css`](app/globals.css) (variables `-
 | La cámara se activa un segundo y se corta | Es un efecto de "Strict Mode" de React en modo desarrollo (monta y desmonta el componente dos veces para detectar fugas) — ya está resuelto en el código actual con un pequeño retraso al pedir la cámara, pero si volvés a ver esto después de tocar `escaner-camara.tsx`, es la primera sospecha | Revisar `modules/pieza/components/escaner-camara.tsx` |
 | Agregar una orden o escanear una pieza no hace nada, sin error visible | La IP de la PC cambió y `next.config.ts` todavía tiene la vieja (bloqueo silencioso de seguridad de Next.js) | Actualizar `allowedDevOrigins` en `next.config.ts` con la IP actual y reiniciar `npm run dev` |
 | El certificado de HTTPS no es de confianza | Es autofirmado, a propósito (no hace falta pagar/gestionar un certificado público para una red interna) | Aceptar el aviso del navegador una vez por dispositivo |
+| El visor muestra solo tres puntos y no abre la hoja | El PDF no llegó o el navegador es muy viejo para pdf.js | Recargar; si el aviso dice "No se pudo abrir la hoja de corte", revisar que el backend esté corriendo. En desarrollo (`npm run dev`), la **primera** carga del visor tarda porque compila pdf.js; en producción abre en menos de un segundo |
+| Subir un PDF falla con "Este PDF es del pedido X…" / "parece ser …" | Se está cargando en el pedido o tipo equivocado (es la verificación funcionando) | Subirlo donde corresponde, o elegir el tipo correcto |
+| Una anotación hecha en otra tablet no aparece | El visor se refresca cada 20 segundos | Esperar unos segundos o recargar la página |
 | Una tabla se corta a la derecha (scroll horizontal) en una pantalla angosta | Con la letra más grande, la tabla de piezas (9 columnas) necesita más de ~800 px | Es esperado en pantallas chicas; en desktop/tablet horizontal entra. Las páginas usan `max-w-6xl` |

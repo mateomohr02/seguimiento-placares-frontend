@@ -26,6 +26,7 @@ const SIN_ANOTACIONES: AnotacionPagina[] = [];
 // aguanta todas rasterizadas a la vez).
 function Pagina({
   pdf,
+  imagenSrc,
   numero,
   cssWidth,
   aspect,
@@ -37,7 +38,9 @@ function Pagina({
   onCrear,
   onBorrar,
 }: {
-  pdf: PDFDocumentProxy;
+  pdf: PDFDocumentProxy | null;
+  /** Si viene, la página es una imagen (planos) y no se usa pdf.js. */
+  imagenSrc?: string;
   numero: number;
   cssWidth: number;
   aspect: number;
@@ -66,7 +69,7 @@ function Pagina({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !pdf) return;
     if (!cerca || cssWidth <= 0) {
       canvas.width = 0;
       canvas.height = 0;
@@ -107,7 +110,12 @@ function Pagina({
       className="relative mx-auto bg-white shadow-md ring-1 ring-black/10"
       style={{ width: cssWidth, height: cssWidth * aspect }}
     >
-      <canvas ref={canvasRef} className="block size-full" />
+      {imagenSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element -- el archivo sale de un proxy propio, no hay nada que optimizar
+        <img src={imagenSrc} alt="" draggable={false} className="block size-full select-none" />
+      ) : (
+        <canvas ref={canvasRef} className="block size-full" />
+      )}
       {cssWidth > 0 && (
         <CapaAnotaciones
           pagina={numero}
@@ -126,17 +134,22 @@ function Pagina({
 }
 
 export function HojaCorteVisor({
-  hojaId,
+  anotacionesUrl,
   src,
+  tipoArchivo = "pdf",
   titulo,
   volverHref,
 }: {
-  hojaId: string;
+  /** Base de la API de anotaciones del documento (ej. /hojas-corte/<id>/anotaciones). */
+  anotacionesUrl: string;
   src: string;
+  /** "imagen" para planos en JPG/PNG/WEBP; por defecto PDF. */
+  tipoArchivo?: "pdf" | "imagen";
   titulo: string;
   volverHref: string;
 }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
+  const [total, setTotal] = useState(0); // cantidad de páginas; 0 = todavía cargando
   const [error, setError] = useState<string | null>(null);
   const [aspect, setAspect] = useState(Math.SQRT2); // A4 hasta conocer la real
   const [ancho, setAncho] = useState(0);
@@ -152,7 +165,7 @@ export function HojaCorteVisor({
   const rafRef = useRef(0);
 
   // Anotaciones (dibujo / texto / notas del documento).
-  const { anotaciones, crear, borrar, deshacer, puedeDeshacer } = useAnotaciones(hojaId, REFRESCO_ANOTACIONES_MS);
+  const { anotaciones, crear, borrar, deshacer, puedeDeshacer } = useAnotaciones(anotacionesUrl, REFRESCO_ANOTACIONES_MS);
   const [edicion, setEdicion] = useState(false);
   const [herramienta, setHerramienta] = useState<Herramienta>("mover");
   const [color, setColor] = useState(paletaDe("lapiz")[0]);
@@ -184,6 +197,22 @@ export function HojaCorteVisor({
   useEffect(() => {
     let cancelled = false;
     let loadingTask: PDFDocumentLoadingTask | null = null;
+    if (tipoArchivo === "imagen") {
+      // Una imagen es un documento de una sola página: solo hace falta su proporción.
+      const img = new Image();
+      img.onload = () => {
+        if (cancelled) return;
+        setAspect(img.naturalHeight / img.naturalWidth);
+        setTotal(1);
+      };
+      img.onerror = () => {
+        if (!cancelled) setError("No se pudo abrir el plano.");
+      };
+      img.src = src;
+      return () => {
+        cancelled = true;
+      };
+    }
     (async () => {
       try {
         const pdfjs = await loadPdfjs();
@@ -198,6 +227,7 @@ export function HojaCorteVisor({
         const vp = first.getViewport({ scale: 1 });
         setAspect(vp.height / vp.width);
         setPdf(loaded);
+        setTotal(loaded.numPages);
       } catch (err) {
         if (!cancelled) {
           console.error(err);
@@ -209,7 +239,7 @@ export function HojaCorteVisor({
       cancelled = true;
       void loadingTask?.destroy();
     };
-  }, [src]);
+  }, [src, tipoArchivo]);
 
   // Ancho disponible (cambia al rotar la tablet).
   useEffect(() => {
@@ -228,7 +258,7 @@ export function HojaCorteVisor({
       clearTimeout(t);
       ro.disconnect();
     };
-  }, [scrollRoot, pdf]);
+  }, [scrollRoot, total]);
 
   // Al cambiar el zoom se conserva la posición relativa dentro del documento.
   useLayoutEffect(() => {
@@ -258,15 +288,14 @@ export function HojaCorteVisor({
   }
 
   function irA(n: number) {
-    if (!pdf || !scrollRoot || !Number.isFinite(n)) return;
-    const pagina = Math.min(Math.max(1, Math.round(n)), pdf.numPages);
+    if (!total || !scrollRoot || !Number.isFinite(n)) return;
+    const pagina = Math.min(Math.max(1, Math.round(n)), total);
     const el = scrollRoot.querySelector<HTMLElement>(`[data-pagina="${pagina}"]`);
     if (el) scrollRoot.scrollTo({ top: el.offsetTop - scrollRoot.offsetTop - 12 });
     setActual(pagina);
   }
 
   const cambiarZoom = (z: number) => setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100)));
-  const total = pdf?.numPages ?? 0;
   const cssWidth = Math.round(ancho * zoom);
 
   return (
@@ -289,7 +318,7 @@ export function HojaCorteVisor({
             min={1}
             max={total || 1}
             defaultValue={actual}
-            disabled={!pdf}
+            disabled={!total}
             enterKeyHint="go"
             className="h-11 w-16 rounded-md border bg-background px-2 text-center"
             onKeyDown={(e) => {
@@ -363,16 +392,17 @@ export function HojaCorteVisor({
           <p role="alert" className="mt-10 text-center text-destructive">
             {error}
           </p>
-        ) : !pdf ? (
+        ) : !total ? (
           <div className="mt-10 flex justify-center text-muted-foreground">
             <LoadingDots />
           </div>
         ) : (
           <div className="flex w-max min-w-full flex-col gap-3">
-            {Array.from({ length: pdf.numPages }, (_, i) => (
+            {Array.from({ length: total }, (_, i) => (
               <Pagina
                 key={i + 1}
                 pdf={pdf}
+                imagenSrc={tipoArchivo === "imagen" ? src : undefined}
                 numero={i + 1}
                 cssWidth={cssWidth}
                 aspect={aspect}
