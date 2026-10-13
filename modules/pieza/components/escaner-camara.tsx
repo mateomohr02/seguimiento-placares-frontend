@@ -12,8 +12,8 @@ import { useHistorialEscaneo } from "../hooks/use-historial-escaneo";
 import { HistorialEscaneo } from "./historial-escaneo";
 
 // diseño.md Vista 5 — modo continuo, código siempre 7 dígitos (idUnico,
-// Code39 fijo). Evita reprocesar el mismo código mientras sigue en cuadro
-// con un cooldown corto, en vez de exigir que el operario lo saque de foco.
+// Code39 fijo). Cooldown global entre escaneos: evita reprocesar el mismo código
+// mientras sigue en cuadro y lecturas seguidas, sin exigir sacarlo de foco.
 const COOLDOWN_MS = 3000;
 
 // Flotante, en vidrio (translúcido): tiene que verse siempre arriba de la imagen de
@@ -36,22 +36,20 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [secure, setSecure] = useState(true);
   const [info, setInfo] = useState<string | null>(null);
-  const lastScan = useRef<{ code: string; at: number } | null>(null);
+  const cooldownHasta = useRef(0);
   const busyRef = useRef(false);
 
   const handleDecoded = useCallback(async (text: string) => {
     if (!/^\d{7}$/.test(text)) return;
 
-    const now = Date.now();
-    if (lastScan.current && lastScan.current.code === text && now - lastScan.current.at < COOLDOWN_MS) {
-      return;
-    }
-    if (busyRef.current) return;
+    // Cooldown global: tras una lectura válida se ignora cualquier código durante
+    // COOLDOWN_MS (cuenta desde que termina el pedido al backend).
+    if (busyRef.current || Date.now() < cooldownHasta.current) return;
     busyRef.current = true;
-    lastScan.current = { code: text, at: now };
 
     const result = await escanearPiezaAction({ idUnico: text });
     busyRef.current = false;
+    cooldownHasta.current = Date.now() + COOLDOWN_MS;
 
     if (!result.success) {
       setErrorMsg(result.message);
