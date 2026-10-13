@@ -22,6 +22,22 @@ function BotonVolver() {
   return <VolverLink href="/" variante="vidrio" className="absolute top-4 left-4 z-10" />;
 }
 
+// Pide enfoque continuo si la cámara lo soporta (sin esto, algunos celulares quedan
+// con el enfoque fijo y no leen la etiqueta). Es opcional: si falla, se sigue igual.
+function enfocarContinuo(video: HTMLVideoElement | null) {
+  const track = (video?.srcObject as MediaStream | null)?.getVideoTracks()[0];
+  if (!track) return;
+  try {
+    const caps = track.getCapabilities() as MediaTrackCapabilities & { focusMode?: string[] };
+    if (!caps.focusMode?.includes("continuous")) return;
+    track
+      .applyConstraints({ advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet] })
+      .catch(() => {});
+  } catch {
+    // navegador sin getCapabilities
+  }
+}
+
 export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; expiraEn: number }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   // Historial de la sesión (en el navegador, se limpia al cerrar/vencer la sesión).
@@ -75,6 +91,15 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
     let controls: IScannerControls | undefined;
     let cancelled = false;
 
+    // Chrome/Samsung Internet en Android rechazan con "setPhotoOptions failed" las
+    // opciones de foto (enfoque, etc.) cuando la pista se detiene mientras se aplican
+    // (ej. al cerrar la cámara). Es inofensivo pero llega como unhandledRejection y
+    // Next lo muestra como error: se descarta solo ese caso.
+    const ignorarSetPhotoOptions = (e: PromiseRejectionEvent) => {
+      if (String((e.reason as { message?: unknown })?.message ?? e.reason).includes("setPhotoOptions")) e.preventDefault();
+    };
+    window.addEventListener("unhandledrejection", ignorarSetPhotoOptions);
+
     // React Strict Mode (dev, App Router) monta el efecto, lo limpia y lo
     // vuelve a montar en el mismo tick para detectar cleanups faltantes. Si
     // pedimos la cámara de inmediato, ese primer getUserMedia queda "vivo" en
@@ -86,7 +111,9 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
       if (cancelled) return;
       reader
         .decodeFromConstraints(
-          { video: { facingMode: "environment" } },
+          // Resolución alta: un Code39 de 7 dígitos impreso chico no se lee con los
+          // 640x480 que algunos celulares eligen por defecto.
+          { video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
           videoRef.current ?? undefined,
           (result, error) => {
             if (result) void handleDecoded(result.getText());
@@ -101,6 +128,7 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
             return;
           }
           controls = c;
+          enfocarContinuo(videoRef.current);
         })
         .catch((err) => {
           setCameraError(err instanceof Error ? err.message : "No se pudo acceder a la cámara.");
@@ -111,6 +139,8 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
       cancelled = true;
       clearTimeout(timer);
       controls?.stop();
+      // Se deja el listener un momento: el rechazo llega después de detener la pista.
+      setTimeout(() => window.removeEventListener("unhandledrejection", ignorarSetPhotoOptions), 3000);
     };
   }, [handleDecoded]);
 
