@@ -12,14 +12,18 @@ import { useHistorialEscaneo } from "../hooks/use-historial-escaneo";
 import { HistorialEscaneo } from "./historial-escaneo";
 
 // diseño.md Vista 5 — modo continuo, código siempre 7 dígitos (idUnico,
-// Code39 fijo). Evita reprocesar el mismo código mientras sigue en cuadro
-// con un cooldown corto, en vez de exigir que el operario lo saque de foco.
+// Code39 fijo). Cooldown global entre escaneos: evita reprocesar el mismo código
+// mientras sigue en cuadro y lecturas seguidas, sin exigir sacarlo de foco.
 const COOLDOWN_MS = 3000;
 
 // Flotante, en vidrio (translúcido): tiene que verse siempre arriba de la imagen de
 // cámara (o de cualquier pantalla de error), es la única forma de salir de Vista 5.
 function BotonVolver() {
   return <VolverLink href="/" variante="vidrio" className="absolute top-4 left-4 z-10" />;
+}
+
+interface BarcodeDetectorCtor {
+  new (opts: { formats: string[] }): { detect(src: HTMLVideoElement): Promise<{ rawValue: string }[]> };
 }
 
 export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; expiraEn: number }) {
@@ -31,22 +35,21 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [secure, setSecure] = useState(true);
-  const lastScan = useRef<{ code: string; at: number } | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const cooldownHasta = useRef(0);
   const busyRef = useRef(false);
 
   const handleDecoded = useCallback(async (text: string) => {
     if (!/^\d{7}$/.test(text)) return;
 
-    const now = Date.now();
-    if (lastScan.current && lastScan.current.code === text && now - lastScan.current.at < COOLDOWN_MS) {
-      return;
-    }
-    if (busyRef.current) return;
+    // Cooldown global: tras una lectura válida se ignora cualquier código durante
+    // COOLDOWN_MS (cuenta desde que termina el pedido al backend).
+    if (busyRef.current || Date.now() < cooldownHasta.current) return;
     busyRef.current = true;
-    lastScan.current = { code: text, at: now };
 
     const result = await escanearPiezaAction({ idUnico: text });
     busyRef.current = false;
+    cooldownHasta.current = Date.now() + COOLDOWN_MS;
 
     if (!result.success) {
       setErrorMsg(result.message);
@@ -68,49 +71,84 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
       return;
     }
 
-    const hints = new Map<DecodeHintType, unknown>();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_39]);
-    const reader = new BrowserMultiFormatReader(hints);
-
-    let controls: IScannerControls | undefined;
     let cancelled = false;
+    let stream: MediaStream | undefined;
+    let controls: IScannerControls | undefined;
+    let loop: ReturnType<typeof setTimeout> | undefined;
+    const videoEl = videoRef.current;
+    const debug = new URLSearchParams(window.location.search).has("debug");
 
-    // React Strict Mode (dev, App Router) monta el efecto, lo limpia y lo
-    // vuelve a montar en el mismo tick para detectar cleanups faltantes. Si
-    // pedimos la cámara de inmediato, ese primer getUserMedia queda "vivo" en
-    // paralelo al segundo — el hardware de la tablet no libera la cámara a
-    // tiempo y el video corta a los pocos segundos. Diferir el pedido real
-    // deja que el ciclo sintético se cancele antes de tocar la cámara, sin
-    // afectar el caso real (un solo mount, con un delay imperceptible).
-    const timer = setTimeout(() => {
-      if (cancelled) return;
-      reader
-        .decodeFromConstraints(
-          { video: { facingMode: "environment" } },
-          videoRef.current ?? undefined,
-          (result, error) => {
+    // Manejamos nosotros el getUserMedia y el cierre de la pista (en vez de dejarlo
+    // a zxing) para que cualquier rechazo de Chrome en Android ("setPhotoOptions
+    // failed") quede atrapado acá. En el celular se usa el BarcodeDetector nativo
+    // (más rápido y más tolerante a etiquetas chicas); si no existe, zxing.
+    const iniciar = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false,
+        });
+        if (cancelled) return;
+        const video = videoRef.current;
+        if (!video) return;
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+
+        const BD = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector;
+        let motor = "zxing";
+        if (BD) {
+          const detector = new BD({ formats: ["code_39"] });
+          motor = "BarcodeDetector";
+          const tick = async () => {
+            if (cancelled) return;
+            try {
+              if (video.readyState >= 2) {
+                const codes = await detector.detect(video);
+                if (codes[0]) void handleDecoded(codes[0].rawValue.replace(/\*/g, ""));
+              }
+            } catch {
+              // frame sin código o video no listo
+            }
+            if (!cancelled) loop = setTimeout(tick, 120);
+          };
+          void tick();
+        } else {
+          const hints = new Map<DecodeHintType, unknown>();
+          hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_39]);
+          const reader = new BrowserMultiFormatReader(hints);
+          controls = await reader.decodeFromStream(stream, video, (result, error) => {
             if (result) void handleDecoded(result.getText());
             else if (error && !(error instanceof NotFoundException)) {
               // NotFoundException es el caso normal "no hay código en este frame"
             }
-          },
-        )
-        .then((c) => {
-          if (cancelled) {
-            c.stop();
-            return;
-          }
-          controls = c;
-        })
-        .catch((err) => {
-          setCameraError(err instanceof Error ? err.message : "No se pudo acceder a la cámara.");
-        });
-    }, 100);
+          });
+        }
+
+        if (debug) {
+          const t = stream.getVideoTracks()[0];
+          const st = t.getSettings();
+          const caps = (t.getCapabilities?.() ?? {}) as MediaTrackCapabilities & { focusMode?: string[] };
+          setInfo(`${motor} · ${t.label} · ${st.width}x${st.height} · enfoque: ${caps.focusMode?.join(",") ?? "n/d"}`);
+        }
+      } catch (err) {
+        if (!cancelled) setCameraError(err instanceof Error ? err.message : "No se pudo acceder a la cámara.");
+      }
+    };
+
+    // React Strict Mode (dev) monta, limpia y vuelve a montar en el mismo tick; si
+    // pedimos la cámara de inmediato el primer getUserMedia queda vivo en paralelo
+    // al segundo. Diferir el pedido deja que el ciclo sintético se cancele antes.
+    const timer = setTimeout(() => void iniciar(), 100);
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
-      controls?.stop();
+      if (loop) clearTimeout(loop);
+      try {
+        controls?.stop();
+      } catch {}
+      stream?.getTracks().forEach((t) => t.stop());
+      if (videoEl) videoEl.srcObject = null;
     };
   }, [handleDecoded]);
 
@@ -143,6 +181,10 @@ export function EscanerCamara({ claveSesion, expiraEn }: { claveSesion: string; 
           <ListIcon className="size-4" />
           Escaneadas ({items.length})
         </button>
+
+        {info && (
+          <div className="absolute inset-x-0 bottom-0 z-10 bg-black/70 p-2 text-xs text-white md:right-80">{info}</div>
+        )}
 
         {avisoError ? (
           <div className={cn("flex h-full items-center justify-center p-6 pt-16 text-center text-sm md:pr-80", secure ? "text-red-400" : "text-gray-300")}>
