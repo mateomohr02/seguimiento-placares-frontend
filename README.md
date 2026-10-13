@@ -318,6 +318,7 @@ Pantalla completa pensada para tablet: la cámara ocupa toda la pantalla y, a la
 
 - **Mira**: un rectángulo con esquinas marcadas y una línea de barrido, con el resto de la imagen atenuada, para apuntar el código de barras. Es solo una guía visual: el lector busca el código en todo el cuadro.
 - Apunta la cámara al código de barras de la etiqueta de corte (siempre 7 dígitos).
+- **Motor de lectura**: `BarcodeDetector` nativo si el navegador lo tiene (celulares Android, muy rápido), si no zxing. `/escaneo?debug=1` muestra una franja con el motor, la cámara y la resolución.
 - **Cooldown de 3 s**: después de cada lectura válida, la cámara ignora cualquier código durante 3 segundos (cuenta desde que responde el servidor).
 - Al reconocer un código válido se agrega arriba del sidebar una **tarjeta** con el resumen (orden, pedido, pieza, medidas, color, código y el módulo con su id entre paréntesis). Hay **una tarjeta por pieza**: si se vuelve a escanear la misma, su tarjeta sube al principio con el resultado más reciente. El historial guarda hasta 100 piezas.
   - **Verde** ("Pieza registrada"): la pieza era nueva. Pasa a "Cortada", y si era la primera de ese módulo/pedido/orden, todos suben de "Pendiente" a "En producción" (o "En proceso" en la orden).
