@@ -30,6 +30,7 @@ La interfaz web que usan **logística** (ver el progreso de las órdenes) y el *
 | **Tailwind CSS** | Estilos por clases utilitarias | Rápido de escribir y de mantener consistente |
 | **React Hook Form + Zod** | Formularios y su validación | Un solo lugar define qué es un dato válido |
 | **pdfjs-dist** (pdf.js) | Dibuja los PDF en la pantalla (en un `<canvas>`) | Los navegadores de las tablets no muestran PDFs embebidos de forma confiable (iOS Safari solo la primera hoja, Android Chrome ninguna). Se usa la build *legacy* para que funcione en navegadores viejos |
+| **three.js** | Dibuja las escenas 3D de los pedidos en un `<canvas>` (WebGL) con cámara orbital | Es el motor del visor de escenas de TeoWin (solo lectura); solo se usa en esa pantalla |
 | **@zxing/browser** | Lectura de códigos de barras usando la cámara del navegador | Es lo que permite escanear sin un lector físico dedicado |
 | **Caddy** | Servidor que agrega HTTPS por delante de esta app | La cámara del navegador **no funciona sin HTTPS** — ver la sección dedicada más abajo |
 
@@ -48,6 +49,7 @@ app/frontend/
 │   ├── ordenes/[id]/hojas-corte/  # Hojas de corte: lista + carga (page.tsx), visor ([hojaId]/page.tsx) y proxy de subida (subir/route.ts)
 │   ├── pedidos/[id]/documentos/[docId]/page.tsx  # Visor de un documento del pedido (+ documentos/subir/route.ts, proxy de subida)
 │   ├── pedidos/[id]/planos/[planoId]/page.tsx    # Visor de un plano (+ planos/subir/route.ts)
+│   ├── pedidos/[id]/escenas/[escenaId]/page.tsx  # Visor 3D de una escena (+ escenas/subir/route.ts, proxy de subida)
 │   ├── hojas-corte/[id]/ · documentos-pedido/[id]/ · planos-pedido/[id]/   # Route handlers: proxys de /archivo y /anotaciones hacia el backend (el navegador no habla con el backend)
 │   ├── red/estado/route.ts       # Endpoint que consulta el comprobador de red (responde si el frontend y el backend están vivos)
 │   ├── loading.tsx               # Pantalla de carga (tres puntos) mientras una página pide sus datos
@@ -60,6 +62,7 @@ app/frontend/
 │   ├── hoja-corte/                # Visor de PDF/imágenes (hoja-corte-visor.tsx), capa de anotaciones, barra de herramientas, hook use-anotaciones. Lo reutilizan documentos y planos
 │   ├── documento-pedido/          # Documentación del pedido: tipos, carga con verificación (lib/analizar-pdf.ts), listado
 │   ├── plano-pedido/              # Planos del pedido: carga, miniaturas, listado
+│   ├── escena-pedido/             # Escenas 3D del pedido (.3d de TeoWin), solo lectura: listado, carga, eliminar y visor three.js (components/escena-visor.tsx)
 │   └── auth/                       # Login por PIN: acción de login/logout y pantalla con teclado numérico
 ├── components/
 │   ├── ui/                       # Componentes genéricos de shadcn/ui (botón, tabla, diálogo...) sin lógica de negocio
@@ -297,11 +300,12 @@ Los pedidos que forman parte de la orden seleccionada: número de pedido, client
 
 ### Vista 3 — Detalle de un pedido (`/pedidos/:id`)
 
-Tres secciones, con una **barra fija arriba** para saltar entre ellas (**Modulación**, **Documentación**, **Planos**; cada botón muestra su cantidad, resalta la sección que estás viendo, y la Documentación lleva un punto ámbar si falta la Nota de Pedido o el Detalle de Remisión):
+Cuatro secciones, con una **barra fija arriba** para saltar entre ellas (**Modulación**, **Documentación**, **Planos**, **Escenas 3D**; cada botón muestra su cantidad, resalta la sección que estás viendo, y la Documentación lleva un punto ámbar si falta la Nota de Pedido o el Detalle de Remisión):
 
 - **Modulación**: los módulos (muebles) del pedido: id, descripción, cantidad de tipos de pieza y estado. Click en el id o en la descripción → Vista 4 de ese módulo. Solo lectura: el estado de cada módulo se calcula a partir de sus piezas.
 - **Documentación**: Nota de Pedido y Detalle de Remisión (obligatorios, se marca "Falta cargar" si no están) y documentación adicional (escandallo, herrajes, accesorios).
 - **Planos**: los planos del pedido (no todos los pedidos los llevan).
+- **Escenas 3D**: las escenas `.3d` de TeoWin del pedido, para ver en 3D (ver [Escenas 3D](#escenas-3d-de-teowin)).
 
 Ver [Documentación digital](#documentación-digital-y-anotaciones).
 
@@ -373,6 +377,15 @@ Se abre con **Abrir**. Muestra todas las hojas en una columna con scroll; solo d
 - Las anotaciones usan `hooks/use-anotaciones.ts` (altas y bajas optimistas con reversión, refresco periódico) y se dibujan en una capa SVG por página (`anotaciones-capa.tsx`).
 - Para sumar otro tipo de documento: tabla + rutas en el backend, route handlers proxy, y reutilizar el visor pasándole su `anotacionesUrl`.
 
+### Escenas 3D de TeoWin
+
+Cada pedido puede tener una o más **escenas 3D** (el archivo `.3d` que TeoWin guarda por pedido), solo para ver: **no se anotan**.
+
+- **Subir** (permiso `documentacion.gestionar`): en la sección **Escenas 3D** del pedido, elegir el `.3d`, ponerle un nombre y **Subir**. El backend lo interpreta al recibirlo; si no es un `.3d` válido o no tiene nada que mostrar, avisa. **Eliminar** (cesto) pide confirmación y es un borrado lógico; se puede volver a cargar.
+- **Abrir** (permiso `documentacion.ver`): muestra la sala (suelo y paredes interiores) con los muebles. **Arrastrar** gira, **rueda o pellizco** acerca, **dos dedos / botón derecho** desplaza. **Escena completa** o un **módulo** aislado desde la lista (el número es el mismo de la tabla de Modulación); **Paredes** las oculta; **Reencuadrar** vuelve a la vista inicial. Las paredes son de una sola cara, así que desde afuera se ve a través de ellas.
+- **Alcance de esta versión**: paneles y paredes con el color real del material (`FSG`, `FGG`, …); sin tiradores, herrajes ni ventanas. Los espesores que dependen del catálogo se aproximan a 18 mm. Detalle: `diseño.md` §13.
+- Para programar: el visor es `modules/escena-pedido/components/escena-visor.tsx` (three.js, sin dependencias de la lógica de negocio); recibe la geometría ya interpretada (`Escena3D`). Los colores por código de material están en `COLOR_MATERIAL`.
+
 ---
 
 ## Diseño visual
@@ -404,5 +417,6 @@ Los tokens de color están en [`app/globals.css`](app/globals.css) (variables `-
 | La app siempre vuelve a la pantalla de PIN | La sesión venció (12 h), el usuario fue dado de baja, se cambió `SESSION_SECRET` en el backend, o el navegador bloquea cookies | Volver a ingresar el PIN; si se repite, verificar que el usuario esté `activo` en la base y que el backend esté corriendo |
 | "PIN incorrecto" con un PIN que debería andar | El usuario no existe, está `activo = false`, o el PIN cargado en la tabla `usuario` es otro | Revisar la fila del usuario en la base (ver el README del backend) |
 | Un botón no aparece o la app responde "No tenés permiso" | El rol del usuario no incluye ese permiso (es lo esperado) | Revisar la tabla de roles de [Ingreso con PIN y roles](#ingreso-con-pin-y-roles); los permisos se editan en la tabla `rol_permiso` del backend |
+| El visor 3D dice que el dispositivo no permite gráficos 3D | El navegador no tiene WebGL disponible (o está desactivado) | Probar con Chrome/Samsung Internet actualizado o con la aceleración por hardware activada |
 | Una anotación hecha en otra tablet no aparece | El visor se refresca cada 20 segundos | Esperar unos segundos o recargar la página |
 | Una tabla se corta a la derecha (scroll horizontal) en una pantalla angosta | Con la letra más grande, la tabla de piezas (9 columnas) necesita más de ~800 px | Es esperado en pantallas chicas; en desktop/tablet horizontal entra. Las páginas usan `max-w-6xl` |
