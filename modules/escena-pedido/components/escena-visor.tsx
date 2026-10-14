@@ -12,12 +12,17 @@ import type { Escena3D } from "../types/escena-pedido.types";
 const COLOR_MATERIAL: Record<string, string> = {
   FSG: "#cac4b8",
   FGG: "#303030",
+  FSN: "#938c85",
+  FBLA: "#f2f2f0",
+  E: "#c3c3c3",
+  ERDAT: "#7f6851",
+  AA: "#b4b3b3",
   "<5002>metall": "#9a9ea3",
   "esfera-gris-clara": "#f0f0f0", // tiradores
 };
 const COLOR_DEFECTO = "#d6d2c8";
 const COLOR_PARED = "#d2d2d0";
-const COLOR_SUELO = "#a89574";
+const COLOR_SUELO = "#c4ad87";
 
 function colorCaja(m: string, c: [number, number, number] | null): THREE.Color {
   const hex = COLOR_MATERIAL[m];
