@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { cn } from "cn";
 import { VolverLink } from "@/components/volver-link";
-import type { Escena3D } from "../types/escena-pedido.types";
+import type { AnimacionEscena, Escena3D } from "../types/escena-pedido.types";
 
-// Colores de los códigos de material de fábrica (promedio de las texturas de
-// T:\datos\3d\E_50\4\Colores). Un código sin entrada usa el color de la pieza.
+// Colores de los códigos de material de fábrica (promedio de las texturas del catálogo 4). Se usan
+// mientras carga la textura real, o si esa textura no está disponible.
 const COLOR_MATERIAL: Record<string, string> = {
   FSG: "#cac4b8",
   FGG: "#303030",
@@ -24,6 +24,13 @@ const COLOR_DEFECTO = "#d6d2c8";
 const COLOR_PARED = "#d2d2d0";
 const COLOR_SUELO = "#c4ad87";
 
+// Las texturas se repiten por medida real: una textura de muebles cubre 1200 mm, una de
+// decoración (piso, papel pintado) 1000 mm.
+const TILE_MUEBLE_MM = 1200;
+const TILE_DECO_MM = 1000;
+
+const DURACION_MS = 550;
+
 function colorCaja(m: string, c: [number, number, number] | null): THREE.Color {
   const hex = COLOR_MATERIAL[m];
   if (hex) return new THREE.Color(hex);
@@ -31,21 +38,77 @@ function colorCaja(m: string, c: [number, number, number] | null): THREE.Color {
   return new THREE.Color(COLOR_DEFECTO);
 }
 
+export const urlTextura = (clave: string) => {
+  const i = clave.indexOf("/");
+  return `/texturas-3d/${clave.slice(0, i)}/${encodeURIComponent(clave.slice(i + 1))}`;
+};
+
+// UV de una caja en milímetros: cada cara repite la textura según su medida real.
+function escalarUvCaja(g: THREE.BoxGeometry, l: number, h: number, p: number, tile: number) {
+  const uv = g.attributes.uv as THREE.BufferAttribute;
+  const dims = [
+    [p, h],
+    [p, h],
+    [l, p],
+    [l, p],
+    [l, h],
+    [l, h],
+  ];
+  for (let f = 0; f < 6; f++) {
+    for (let k = 0; k < 4; k++) {
+      const i = f * 4 + k;
+      uv.setXY(i, (uv.getX(i) * dims[f][0]) / tile, (uv.getY(i) * dims[f][1]) / tile);
+    }
+  }
+  uv.needsUpdate = true;
+}
+
+interface Animable {
+  grupo: THREE.Group;
+  def: AnimacionEscena;
+  /** Avance actual y objetivo, de 0 (cerrado) a 1 (abierto). */
+  t: number;
+  objetivo: number;
+}
+
 // Arma los objetos three.js de una escena (se crean una vez por escena).
 function construirGrupos(escena: Escena3D) {
+  const catalogoDe = new Map(escena.modulos.map((m) => [m.idEscena, m.catalogo]));
   const porModulo = new Map<number, THREE.Group>();
   const modulos = new THREE.Group();
   const geoms: THREE.BufferGeometry[] = [];
   const mats: THREE.Material[] = [];
+  /** Materiales que esperan una textura, por clave "catálogo/código". */
+  const porClave = new Map<string, THREE.MeshLambertMaterial[]>();
+  const cacheMat = new Map<string, THREE.MeshLambertMaterial>();
+  const matDe = (clave: string | null, color: THREE.Color, doble = false) => {
+    const k = `${clave ?? ""}|${color.getHexString()}|${doble}`;
+    let m = cacheMat.get(k);
+    if (!m) {
+      m = new THREE.MeshLambertMaterial({ color, side: doble ? THREE.DoubleSide : THREE.FrontSide });
+      cacheMat.set(k, m);
+      mats.push(m);
+      if (clave) porClave.set(clave, [...(porClave.get(clave) ?? []), m]);
+    }
+    return m;
+  };
+
   const matBorde = new THREE.LineBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.45 });
   mats.push(matBorde);
+
+  // Un grupo por cajón / hoja corrediza: se desplaza como un todo.
+  const anims: Animable[] = escena.animaciones.map((def) => ({ grupo: new THREE.Group(), def, t: 0, objetivo: 0 }));
+  const animAgregado = new Set<number>();
+
   for (const c of escena.cajas) {
     const g = new THREE.BoxGeometry(c.s[0], c.s[1], c.s[2]);
     g.translate(c.s[0] / 2, c.s[1] / 2, c.s[2] / 2);
+    escalarUvCaja(g, c.s[0], c.s[1], c.s[2], TILE_MUEBLE_MM);
     geoms.push(g);
-    const mat = new THREE.MeshLambertMaterial({ color: colorCaja(c.m, c.c) });
-    mats.push(mat);
+    const cat = catalogoDe.get(c.mod ?? -1) ?? "4";
+    const mat = matDe(c.m ? `${cat}/${c.m}` : null, colorCaja(c.m, c.c));
     const mesh = new THREE.Mesh(g, mat);
+    if (c.a !== undefined) mesh.userData.anim = c.a;
     const borde = new THREE.LineSegments(new THREE.EdgesGeometry(g), matBorde);
     geoms.push(borde.geometry);
     const obj = new THREE.Group();
@@ -60,7 +123,14 @@ function construirGrupos(escena: Escena3D) {
       porModulo.set(id, grupo);
       modulos.add(grupo);
     }
-    grupo.add(obj);
+    const anim = c.a !== undefined ? anims[c.a] : undefined;
+    if (anim) {
+      if (!animAgregado.has(c.a!)) {
+        animAgregado.add(c.a!);
+        grupo.add(anim.grupo);
+      }
+      anim.grupo.add(obj);
+    } else grupo.add(obj);
   }
 
   // Suelo: el contorno sale de las paredes interiores (x, z).
@@ -68,11 +138,12 @@ function construirGrupos(escena: Escena3D) {
   if (escena.suelo.length >= 3) {
     const forma = new THREE.Shape(escena.suelo.map(([x, z]) => new THREE.Vector2(x, -z)));
     const g = new THREE.ShapeGeometry(forma);
+    const uv = g.attributes.uv as THREE.BufferAttribute;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / TILE_DECO_MM, uv.getY(i) / TILE_DECO_MM);
     g.rotateX(-Math.PI / 2);
     geoms.push(g);
-    const m = new THREE.MeshLambertMaterial({ color: COLOR_SUELO, side: THREE.DoubleSide });
-    mats.push(m);
-    entorno.add(new THREE.Mesh(g, m));
+    const clave = escena.materialSuelo ? `641/${escena.materialSuelo}` : null;
+    entorno.add(new THREE.Mesh(g, matDe(clave, new THREE.Color(COLOR_SUELO), true)));
   }
 
   // Paredes: solo la cara interior, con su normal hacia el centro del cuarto
@@ -92,12 +163,23 @@ function construirGrupos(escena: Escena3D) {
     if (n.dot(new THREE.Vector3().subVectors(centro, medio)) < 0) tri = [a, c, b, a, d, c];
     const g = new THREE.BufferGeometry().setFromPoints(tri);
     g.computeVertexNormals();
+    // UV por medida real sobre el plano de la pared.
+    const e1 = new THREE.Vector3().subVectors(b, a).normalize();
+    const e2 = new THREE.Vector3().subVectors(d, a).normalize();
+    g.setAttribute(
+      "uv",
+      new THREE.Float32BufferAttribute(
+        tri.flatMap((v) => {
+          const rel = new THREE.Vector3().subVectors(v, a);
+          return [rel.dot(e1) / TILE_DECO_MM, rel.dot(e2) / TILE_DECO_MM];
+        }),
+        2,
+      ),
+    );
     geoms.push(g);
-    const m = new THREE.MeshLambertMaterial({ color: COLOR_PARED, side: THREE.FrontSide });
-    mats.push(m);
-    pared.add(new THREE.Mesh(g, m));
+    pared.add(new THREE.Mesh(g, matDe(w.m ? `641/${w.m}` : null, new THREE.Color(COLOR_PARED))));
   }
-  return { porModulo, modulos, entorno, pared, geoms, mats };
+  return { porModulo, modulos, entorno, pared, anims, porClave, geoms, mats };
 }
 
 type Grupos = ReturnType<typeof construirGrupos>;
@@ -109,10 +191,47 @@ function aplicarVista(grupos: Grupos, seleccion: number | null, paredes: boolean
   grupos.entorno.visible = seleccion === null;
 }
 
+const suavizar = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+
+/** Avanza las animaciones `dt` ms; devuelve true si alguna sigue en movimiento. */
+function avanzarAnimaciones(grupos: Grupos, dt: number): boolean {
+  let activo = false;
+  for (const a of grupos.anims) {
+    if (a.t === a.objetivo) continue;
+    const paso = dt / DURACION_MS;
+    a.t = a.objetivo > a.t ? Math.min(a.objetivo, a.t + paso) : Math.max(a.objetivo, a.t - paso);
+    const k = suavizar(a.t) * a.def.dist;
+    a.grupo.position.set(a.def.eje[0] * k, a.def.eje[1] * k, a.def.eje[2] * k);
+    if (a.t !== a.objetivo) activo = true;
+  }
+  return activo;
+}
+
+function fijarObjetivos(grupos: Grupos, indices: number[], abrir: (i: number) => boolean) {
+  for (const i of indices) {
+    const a = grupos.anims[i];
+    if (a) a.objetivo = abrir(i) ? 1 : 0;
+  }
+}
+
+const visibleEnCadena = (o: THREE.Object3D | null) => {
+  for (let x = o; x; x = x.parent) if (!x.visible) return false;
+  return true;
+};
+
+interface Api {
+  encuadrar: (mod: number | null) => void;
+  grupos: Grupos;
+  mover: (indices: number[], abrir: (i: number) => boolean) => void;
+  alternar: (i: number) => void;
+  dibujar: () => void;
+}
+
 // Visor 3D de solo lectura de una escena de TeoWin (cámara orbital: arrastrar gira,
 // rueda/pellizco acerca, dos dedos o botón derecho desplaza). Los módulos se pueden
 // aislar desde la lista; las paredes (solo su cara interior, que se ve desde adentro)
-// se pueden ocultar. v1: paneles y paredes; sin tiradores, herrajes ni ventanas.
+// se pueden ocultar. Los cajones y las hojas corredizas se abren (botones, o tocando la pieza).
+// Los materiales se muestran con su textura real; mientras cargan, con su color medio.
 export function EscenaVisor({
   escena,
   titulo,
@@ -126,8 +245,19 @@ export function EscenaVisor({
   const [seleccion, setSeleccion] = useState<number | null>(null); // idEscena aislado
   const [paredes, setParedes] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const api = useRef<{ encuadrar: (mod: number | null) => void; grupos: Grupos } | null>(null);
+  const api = useRef<Api | null>(null);
+  // Hoja de puerta abierta: 0 = todas cerradas, n = se abrió la hoja n.
+  const [puertaAbierta, setPuertaAbierta] = useState(0);
+  const [cajonesAbiertos, setCajonesAbiertos] = useState(false);
 
+  const puertas = useMemo(
+    () => escena.animaciones.flatMap((a, i) => (a.tipo === "puerta" ? [i] : [])),
+    [escena.animaciones],
+  );
+  const cajones = useMemo(
+    () => escena.animaciones.flatMap((a, i) => (a.tipo === "cajon" ? [i] : [])),
+    [escena.animaciones],
+  );
 
   // Escena three.js (se crea y se destruye con el componente).
   useEffect(() => {
@@ -148,8 +278,8 @@ export function EscenaVisor({
     renderer.domElement.style.touchAction = "none";
 
     const scene = new THREE.Scene();
-    scene.add(new THREE.AmbientLight(0xffffff, 0.95));
-    const sol = new THREE.DirectionalLight(0xffffff, 1.1);
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+    const sol = new THREE.DirectionalLight(0xffffff, 0.3);
     sol.position.set(-1500, 4000, 2500);
     scene.add(sol);
     scene.add(grupos.entorno, grupos.pared, grupos.modulos);
@@ -195,12 +325,91 @@ export function EscenaVisor({
       controls.update();
       dibujar();
     };
-    api.current = { encuadrar, grupos };
+
+    // Animaciones: un cuadro por vez mientras algo se mueve.
+    let raf = 0;
+    let ultimo = 0;
+    const paso = (ts: number) => {
+      const activo = avanzarAnimaciones(grupos, ultimo ? ts - ultimo : 16);
+      ultimo = ts;
+      dibujar();
+      if (activo) raf = requestAnimationFrame(paso);
+      else {
+        raf = 0;
+        ultimo = 0;
+      }
+    };
+    const arrancar = () => {
+      if (!raf) {
+        ultimo = 0;
+        raf = requestAnimationFrame(paso);
+      }
+    };
+    const mover = (indices: number[], abrir: (i: number) => boolean) => {
+      fijarObjetivos(grupos, indices, abrir);
+      arrancar();
+    };
+    const alternar = (i: number) => {
+      const a = grupos.anims[i];
+      if (a) mover([i], () => a.objetivo < 0.5);
+    };
+
+    // Tocar un cajón o una hoja la abre / cierra (un toque, no un arrastre).
+    const dom = renderer.domElement;
+    const raycaster = new THREE.Raycaster();
+    let inicio: { x: number; y: number } | null = null;
+    const alBajar = (e: PointerEvent) => {
+      inicio = { x: e.clientX, y: e.clientY };
+    };
+    const alSubir = (e: PointerEvent) => {
+      const desde = inicio;
+      inicio = null;
+      if (!desde || Math.hypot(e.clientX - desde.x, e.clientY - desde.y) > 6) return;
+      const r = dom.getBoundingClientRect();
+      raycaster.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+      const hit = raycaster.intersectObject(grupos.modulos, true).find((h) => visibleEnCadena(h.object));
+      const a = hit?.object.userData.anim;
+      if (typeof a === "number") alternar(a);
+    };
+    dom.addEventListener("pointerdown", alBajar);
+    dom.addEventListener("pointerup", alSubir);
+
+    // Texturas reales de los materiales (por catálogo); si una no está, queda el color liso.
+    const loader = new THREE.TextureLoader();
+    const texturas: THREE.Texture[] = [];
+    let vivo = true;
+    for (const [clave, matsClave] of grupos.porClave) {
+      loader.load(
+        urlTextura(clave),
+        (tex) => {
+          if (!vivo) return tex.dispose();
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+          texturas.push(tex);
+          for (const m of matsClave) {
+            m.map = tex;
+            m.color.set(0xffffff);
+            m.needsUpdate = true;
+          }
+          dibujar();
+        },
+        undefined,
+        () => {},
+      );
+    }
+
+    api.current = { encuadrar, grupos, mover, alternar, dibujar };
     ajustar();
     encuadrar(null);
 
     return () => {
+      vivo = false;
       api.current = null;
+      if (raf) cancelAnimationFrame(raf);
+      dom.removeEventListener("pointerdown", alBajar);
+      dom.removeEventListener("pointerup", alSubir);
+      texturas.forEach((t) => t.dispose());
       grupos.geoms.forEach((g) => g.dispose());
       grupos.mats.forEach((m) => m.dispose());
       ro.disconnect();
@@ -218,11 +427,52 @@ export function EscenaVisor({
     actual.encuadrar(seleccion);
   }, [seleccion, paredes, escena]);
 
+  // Botón de puertas: cierra → abre la hoja 1 → abre la hoja 2 → … → cierra.
+  function ciclarPuertas() {
+    const siguiente = (puertaAbierta + 1) % (puertas.length + 1);
+    setPuertaAbierta(siguiente);
+    api.current?.mover(puertas, (i) => puertas.indexOf(i) === siguiente - 1);
+  }
+  function alternarCajones() {
+    const abrir = !cajonesAbiertos;
+    setCajonesAbiertos(abrir);
+    api.current?.mover(cajones, () => abrir);
+  }
+
+  const etiquetaPuertas =
+    puertas.length === 1
+      ? puertaAbierta === 0
+        ? "Abrir puerta"
+        : "Cerrar puerta"
+      : puertaAbierta === 0
+        ? "Abrir puertas"
+        : puertaAbierta < puertas.length
+          ? "Siguiente hoja"
+          : "Cerrar puertas";
+
   return (
     <div className="flex h-dvh w-full flex-col bg-background">
       <header className="flex flex-wrap items-center gap-3 border-b px-4 py-2">
         <VolverLink href={volverHref} grande />
         <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{titulo}</h1>
+        {puertas.length > 0 && (
+          <button
+            type="button"
+            onClick={ciclarPuertas}
+            className="h-11 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-muted"
+          >
+            {etiquetaPuertas}
+          </button>
+        )}
+        {cajones.length > 0 && (
+          <button
+            type="button"
+            onClick={alternarCajones}
+            className="h-11 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-muted"
+          >
+            {cajonesAbiertos ? "Cerrar cajones" : "Abrir cajones"}
+          </button>
+        )}
         <label className="flex h-11 items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -278,6 +528,7 @@ export function EscenaVisor({
           ))}
           <p className="hidden text-xs text-muted-foreground md:block">
             Vista de solo lectura. Arrastrá para girar, rueda o pellizco para acercar, dos dedos para desplazar.
+            Tocá un cajón o una hoja de puerta para abrirla.
           </p>
         </aside>
       </div>

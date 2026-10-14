@@ -50,6 +50,7 @@ app/frontend/
 │   ├── pedidos/[id]/documentos/[docId]/page.tsx  # Visor de un documento del pedido (+ documentos/subir/route.ts, proxy de subida)
 │   ├── pedidos/[id]/planos/[planoId]/page.tsx    # Visor de un plano (+ planos/subir/route.ts)
 │   ├── pedidos/[id]/escenas/[escenaId]/page.tsx  # Visor 3D de una escena (+ escenas/subir/route.ts, proxy de subida)
+│   ├── texturas-3d/[catalogo]/[material]/route.ts # Route handler: proxy de las texturas de las escenas 3D hacia el backend
 │   ├── hojas-corte/[id]/ · documentos-pedido/[id]/ · planos-pedido/[id]/   # Route handlers: proxys de /archivo y /anotaciones hacia el backend (el navegador no habla con el backend)
 │   ├── red/estado/route.ts       # Endpoint que consulta el comprobador de red (responde si el frontend y el backend están vivos)
 │   ├── loading.tsx               # Pantalla de carga (tres puntos) mientras una página pide sus datos
@@ -383,8 +384,10 @@ Cada pedido puede tener una o más **escenas 3D** (el archivo `.3d` que TeoWin g
 
 - **Subir** (permiso `documentacion.gestionar`): en la sección **Escenas 3D** del pedido, elegir el `.3d`, ponerle un nombre y **Subir**. El backend lo interpreta al recibirlo; si no es un `.3d` válido o no tiene nada que mostrar, avisa. **Eliminar** (cesto) pide confirmación y es un borrado lógico; se puede volver a cargar.
 - **Abrir** (permiso `documentacion.ver`): muestra la sala (suelo y paredes interiores) con los muebles. **Arrastrar** gira, **rueda o pellizco** acerca, **dos dedos / botón derecho** desplaza. **Escena completa** o un **módulo** aislado desde la lista (el número es el mismo de la tabla de Modulación); **Paredes** las oculta; **Reencuadrar** vuelve a la vista inicial. Las paredes son de una sola cara, así que desde afuera se ve a través de ellas.
-- **Alcance de esta versión**: paneles, tiradores y paredes con el color real del material (`FSG`, `FGG`, …); sin herrajes ni ventanas. Los espesores que dependen del catálogo se aproximan a 18 mm. Detalle: `diseño.md` §13.
-- Para programar: el visor es `modules/escena-pedido/components/escena-visor.tsx` (three.js, sin dependencias de la lógica de negocio); recibe la geometría ya interpretada (`Escena3D`). Los colores por código de material están en `COLOR_MATERIAL`.
+- **Cajones y puertas**: **Abrir cajones / Cerrar cajones** abre o cierra todos los cajones; el botón de **puertas** recorre *cerradas → hoja 1 abierta → hoja 2 abierta → cerradas*. También se puede **tocar un cajón o una hoja** para abrirla o cerrarla (un toque, no un arrastre). Parte siempre cerrado.
+- **Texturas**: los materiales se ven con su textura real (melaminas de Placares, papel pintado, cemento, parquet); mientras cargan, o si una textura no existe, se ve el color medio del material. Se pidieron por catálogo (4 Placares, 3 Cocinas, 641 decoración).
+- **Alcance de esta versión**: paneles, tiradores y paredes; sin herrajes ni ventanas. Los espesores que dependen del catálogo se aproximan a 18 mm. Detalle: `diseño.md` §13.
+- Para programar: el visor es `modules/escena-pedido/components/escena-visor.tsx` (three.js, sin dependencias de la lógica de negocio); recibe la geometría ya interpretada (`Escena3D`). Las texturas se piden por `/texturas-3d/<catálogo>/<código>`; el UV es por medida real (`TILE_*_MM`). Las animaciones son grupos de three.js (`Animable`) que `avanzarAnimaciones` desplaza; los colores de respaldo están en `COLOR_MATERIAL`.
 
 ---
 
