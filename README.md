@@ -383,7 +383,7 @@ Cada pedido puede tener una o más **escenas 3D** (el archivo `.3d` que TeoWin g
 
 - **Subir** (permiso `documentacion.gestionar`): en la sección **Escenas 3D** del pedido, elegir el `.3d`, ponerle un nombre y **Subir**. El backend lo interpreta al recibirlo; si no es un `.3d` válido o no tiene nada que mostrar, avisa. **Eliminar** (cesto) pide confirmación y es un borrado lógico; se puede volver a cargar.
 - **Abrir** (permiso `documentacion.ver`): muestra la sala (suelo y paredes interiores) con los muebles. **Arrastrar** gira, **rueda o pellizco** acerca, **dos dedos / botón derecho** desplaza. **Escena completa** o un **módulo** aislado desde la lista (el número es el mismo de la tabla de Modulación); **Paredes** las oculta; **Reencuadrar** vuelve a la vista inicial. Las paredes son de una sola cara, así que desde afuera se ve a través de ellas.
-- **Alcance de esta versión**: paneles y paredes con el color real del material (`FSG`, `FGG`, …); sin tiradores, herrajes ni ventanas. Los espesores que dependen del catálogo se aproximan a 18 mm. Detalle: `diseño.md` §13.
+- **Alcance de esta versión**: paneles, tiradores y paredes con el color real del material (`FSG`, `FGG`, …); sin herrajes ni ventanas. Los espesores que dependen del catálogo se aproximan a 18 mm. Detalle: `diseño.md` §13.
 - Para programar: el visor es `modules/escena-pedido/components/escena-visor.tsx` (three.js, sin dependencias de la lógica de negocio); recibe la geometría ya interpretada (`Escena3D`). Los colores por código de material están en `COLOR_MATERIAL`.
 
 ---

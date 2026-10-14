@@ -13,6 +13,7 @@ const COLOR_MATERIAL: Record<string, string> = {
   FSG: "#cac4b8",
   FGG: "#303030",
   "<5002>metall": "#9a9ea3",
+  "esfera-gris-clara": "#f0f0f0", // tiradores
 };
 const COLOR_DEFECTO = "#d6d2c8";
 const COLOR_PARED = "#d2d2d0";
