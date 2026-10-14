@@ -17,6 +17,8 @@ export interface CajaEscena {
   s: [number, number, number];
   /** Índice en `animaciones` si la pieza se mueve con un cajón o una hoja corrediza. */
   a?: number;
+  /** Catálogo de la pieza si no es el 4 (ej. 658 = puertas): dónde buscar su textura. */
+  k?: string;
 }
 
 export interface ParedEscena {
@@ -32,6 +34,8 @@ export interface ModuloEscena {
   familia: string;
   /** Catálogo del mueble (4 = Placares, 3 = Cocinas). */
   catalogo: string;
+  /** Hacia dónde mira el frente del mueble en la escena (vector unitario). */
+  frente: [number, number, number];
   dim: [number, number, number];
 }
 

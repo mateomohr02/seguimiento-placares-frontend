@@ -105,7 +105,7 @@ function construirGrupos(escena: Escena3D) {
     g.translate(c.s[0] / 2, c.s[1] / 2, c.s[2] / 2);
     escalarUvCaja(g, c.s[0], c.s[1], c.s[2], TILE_MUEBLE_MM);
     geoms.push(g);
-    const cat = catalogoDe.get(c.mod ?? -1) ?? "4";
+    const cat = c.k ?? catalogoDe.get(c.mod ?? -1) ?? "4";
     const mat = matDe(c.m ? `${cat}/${c.m}` : null, colorCaja(c.m, c.c));
     const mesh = new THREE.Mesh(g, mat);
     if (c.a !== undefined) mesh.userData.anim = c.a;
@@ -317,7 +317,15 @@ export function EscenaVisor({
       const centro = caja.getCenter(new THREE.Vector3());
       const radio = caja.getSize(new THREE.Vector3()).length() / 2;
       const dist = radio / Math.sin((camera.fov * Math.PI) / 360);
-      camera.position.copy(centro).add(new THREE.Vector3(0.45, 0.55, 1).normalize().multiplyScalar(dist));
+      // Un módulo aislado se mira de frente (su +Z local, rotado en la escena), un poco de costado y desde arriba.
+      const m = mod !== null ? escena.modulos.find((x) => x.idEscena === mod) : undefined;
+      const f = m ? new THREE.Vector3(m.frente[0], 0, m.frente[2]) : new THREE.Vector3(0, 0, 1);
+      if (f.lengthSq() < 0.01) f.set(0, 0, 1);
+      f.normalize();
+      const lado = new THREE.Vector3(0, 1, 0).cross(f); // a la derecha de quien mira al mueble
+      // Escena completa: más desde arriba, para ver el interior de la sala (las paredes son de una cara).
+      const dir = f.clone().add(lado.multiplyScalar(0.45)).add(new THREE.Vector3(0, m ? 0.55 : 1.1, 0)).normalize();
+      camera.position.copy(centro).add(dir.multiplyScalar(dist));
       controls.target.copy(centro);
       camera.near = Math.max(dist / 200, 1);
       camera.far = dist * 20;
