@@ -30,6 +30,8 @@ export interface ParedEscena {
   m?: string;
   /** Medida (mm) de la baldosa del revestimiento: la textura entera cubre una baldosa. */
   t?: [number, number];
+  /** Huecos de la cara (puertas de paso): [x0, y0, x1, y1] en mm sobre la cara. */
+  h?: [number, number, number, number][];
 }
 
 export interface ModuloEscena {

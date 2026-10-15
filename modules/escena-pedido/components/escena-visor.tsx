@@ -188,15 +188,46 @@ function construirGrupos(escena: Escena3D) {
   for (const w of escena.paredes) {
     if (w.lado !== "int") continue;
     const [a, b, c, d] = w.p.map((q) => new THREE.Vector3(q[0], q[1], q[2]));
-    let tri = [a, b, c, a, c, d];
+    const e1 = new THREE.Vector3().subVectors(b, a).normalize();
+    const e2 = new THREE.Vector3().subVectors(d, a).normalize();
+    const ancho = a.distanceTo(b);
+    const alto = a.distanceTo(d);
+    // Triángulos de la cara: un rectángulo, o el rectángulo con huecos (puertas de paso).
+    let tri: THREE.Vector3[];
+    if (w.h?.length) {
+      const en3d = (u: number, v: number) => a.clone().addScaledVector(e1, u).addScaledVector(e2, v);
+      // Un hueco que toca el piso es una muesca del contorno; los demás, agujeros.
+      const huecos = [...w.h].sort((p, q) => p[0] - q[0]);
+      const forma = new THREE.Shape();
+      forma.moveTo(0, 0);
+      for (const [x0, y0, x1, y1] of huecos) {
+        if (y0 <= 0.5) forma.lineTo(x0, 0).lineTo(x0, y1).lineTo(x1, y1).lineTo(x1, 0);
+      }
+      forma.lineTo(ancho, 0).lineTo(ancho, alto).lineTo(0, alto).lineTo(0, 0);
+      for (const [x0, y0, x1, y1] of huecos) {
+        if (y0 > 0.5) {
+          const agujero = new THREE.Path();
+          agujero.moveTo(x0, y0).lineTo(x1, y0).lineTo(x1, y1).lineTo(x0, y1).lineTo(x0, y0);
+          forma.holes.push(agujero);
+        }
+      }
+      const sg = new THREE.ShapeGeometry(forma);
+      const pos = sg.attributes.position as THREE.BufferAttribute;
+      const idx = sg.index ? Array.from(sg.index.array) : Array.from({ length: pos.count }, (_, i) => i);
+      tri = idx.map((i) => en3d(pos.getX(i), pos.getY(i)));
+      sg.dispose();
+    } else tri = [a, b, c, a, c, d];
+    // Cara simple: la normal tiene que apuntar al centro del cuarto.
     const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
     const medio = new THREE.Vector3().add(a).add(c).multiplyScalar(0.5);
-    if (n.dot(new THREE.Vector3().subVectors(centro, medio)) < 0) tri = [a, c, b, a, d, c];
+    if (n.dot(new THREE.Vector3().subVectors(centro, medio)) < 0) {
+      const inv: THREE.Vector3[] = [];
+      for (let i = 0; i < tri.length; i += 3) inv.push(tri[i], tri[i + 2], tri[i + 1]);
+      tri = inv;
+    }
     const g = new THREE.BufferGeometry().setFromPoints(tri);
     g.computeVertexNormals();
     // UV por medida real sobre el plano de la pared.
-    const e1 = new THREE.Vector3().subVectors(b, a).normalize();
-    const e2 = new THREE.Vector3().subVectors(d, a).normalize();
     g.setAttribute(
       "uv",
       new THREE.Float32BufferAttribute(
