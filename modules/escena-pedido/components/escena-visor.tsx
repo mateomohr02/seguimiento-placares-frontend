@@ -22,7 +22,7 @@ const COLOR_MATERIAL: Record<string, string> = {
 };
 const COLOR_DEFECTO = "#d6d2c8";
 const COLOR_PARED = "#d2d2d0";
-const COLOR_SUELO = "#c4ad87";
+const COLOR_SUELO = "#d9d9d9"; // piso sin material: TeoWin lo muestra gris claro
 
 // Las texturas se repiten por medida real: una textura de muebles cubre 1200 mm, una de
 // decoración (piso, papel pintado) 1000 mm.
@@ -63,6 +63,26 @@ function escalarUvCaja(g: THREE.BoxGeometry, l: number, h: number, p: number, ti
   uv.needsUpdate = true;
 }
 
+// Copia de la textura de una baldosa con las juntas (línea oscura en el borde), como las dibuja TeoWin.
+function texturaConJuntas(tex: THREE.Texture, lista: THREE.Texture[]): THREE.Texture {
+  const img = tex.image as CanvasImageSource & { width: number; height: number };
+  const lado = 512;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = lado;
+  const ctx = cv.getContext("2d");
+  if (!ctx) return tex;
+  ctx.drawImage(img, 0, 0, lado, lado);
+  ctx.strokeStyle = "#1c1c1c";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(0, 0, lado, lado);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = tex.anisotropy;
+  lista.push(t);
+  return t;
+}
+
 interface Animable {
   grupo: THREE.Group;
   def: AnimacionEscena;
@@ -81,11 +101,13 @@ function construirGrupos(escena: Escena3D) {
   /** Materiales que esperan una textura, por clave "catálogo/código". */
   const porClave = new Map<string, THREE.MeshLambertMaterial[]>();
   const cacheMat = new Map<string, THREE.MeshLambertMaterial>();
-  const matDe = (clave: string | null, color: THREE.Color, doble = false) => {
-    const k = `${clave ?? ""}|${color.getHexString()}|${doble}`;
+  const matDe = (clave: string | null, color: THREE.Color, doble = false, rejilla = false) => {
+    const k = `${clave ?? ""}|${color.getHexString()}|${doble}|${rejilla}`;
     let m = cacheMat.get(k);
     if (!m) {
       m = new THREE.MeshLambertMaterial({ color, side: doble ? THREE.DoubleSide : THREE.FrontSide });
+      // Revestimiento de baldosas: la textura entera cubre una baldosa y se marcan las juntas.
+      if (rejilla) m.userData.rejilla = true;
       cacheMat.set(k, m);
       mats.push(m);
       if (clave) porClave.set(clave, [...(porClave.get(clave) ?? []), m]);
@@ -139,11 +161,12 @@ function construirGrupos(escena: Escena3D) {
     const forma = new THREE.Shape(escena.suelo.map(([x, z]) => new THREE.Vector2(x, -z)));
     const g = new THREE.ShapeGeometry(forma);
     const uv = g.attributes.uv as THREE.BufferAttribute;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / TILE_DECO_MM, uv.getY(i) / TILE_DECO_MM);
+    const tileSuelo = escena.sueloTile ?? [TILE_DECO_MM, TILE_DECO_MM];
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / tileSuelo[0], uv.getY(i) / tileSuelo[1]);
     g.rotateX(-Math.PI / 2);
     geoms.push(g);
     const clave = escena.materialSuelo ? `641/${escena.materialSuelo}` : null;
-    entorno.add(new THREE.Mesh(g, matDe(clave, new THREE.Color(COLOR_SUELO), true)));
+    entorno.add(new THREE.Mesh(g, matDe(clave, new THREE.Color(COLOR_SUELO), true, !!clave && !!escena.sueloTile)));
   }
 
   // Paredes: solo la cara interior, con su normal hacia el centro del cuarto
@@ -171,13 +194,13 @@ function construirGrupos(escena: Escena3D) {
       new THREE.Float32BufferAttribute(
         tri.flatMap((v) => {
           const rel = new THREE.Vector3().subVectors(v, a);
-          return [rel.dot(e1) / TILE_DECO_MM, rel.dot(e2) / TILE_DECO_MM];
+          return [rel.dot(e1) / (w.t?.[0] ?? TILE_DECO_MM), rel.dot(e2) / (w.t?.[1] ?? TILE_DECO_MM)];
         }),
         2,
       ),
     );
     geoms.push(g);
-    pared.add(new THREE.Mesh(g, matDe(w.m ? `641/${w.m}` : null, new THREE.Color(COLOR_PARED))));
+    pared.add(new THREE.Mesh(g, matDe(w.m ? `641/${w.m}` : null, new THREE.Color(COLOR_PARED), false, !!w.m && !!w.t)));
   }
   return { porModulo, modulos, entorno, pared, anims, porClave, geoms, mats };
 }
@@ -395,8 +418,10 @@ export function EscenaVisor({
           tex.colorSpace = THREE.SRGBColorSpace;
           tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
           texturas.push(tex);
+          let conJuntas: THREE.Texture | null = null;
           for (const m of matsClave) {
-            m.map = tex;
+            if (m.userData.rejilla) conJuntas ??= texturaConJuntas(tex, texturas);
+            m.map = m.userData.rejilla && conJuntas ? conJuntas : tex;
             m.color.set(0xffffff);
             m.needsUpdate = true;
           }

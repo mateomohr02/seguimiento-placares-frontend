@@ -26,6 +26,8 @@ export interface ParedEscena {
   p: [number, number, number][];
   /** Material decorativo de la cara (ej. papel pintado). */
   m?: string;
+  /** Medida (mm) de la baldosa del revestimiento: la textura entera cubre una baldosa. */
+  t?: [number, number];
 }
 
 export interface ModuloEscena {
@@ -57,6 +59,8 @@ export interface Escena3D {
   paredes: ParedEscena[];
   animaciones: AnimacionEscena[];
   materialSuelo: string | null;
+  /** Medida (mm) de la baldosa del piso (escenas interpretadas con la versión 11 o posterior). */
+  sueloTile?: [number, number] | null;
   /** Materiales usados como "catálogo/código" (para pedir sus texturas). */
   materiales: string[];
   suelo: [number, number][];
