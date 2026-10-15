@@ -17,6 +17,8 @@ export interface CajaEscena {
   s: [number, number, number];
   /** Índice en `animaciones` si la pieza se mueve con un cajón o una hoja corrediza. */
   a?: number;
+  /** Opacidad de una pieza translúcida (vidrio); sin dato = opaca. */
+  o?: number;
   /** Catálogo de la pieza si no es el 4 (ej. 658 = puertas): dónde buscar su textura. */
   k?: string;
 }
@@ -43,10 +45,13 @@ export interface ModuloEscena {
 
 /** Grupo de piezas que se desplazan juntas: un cajón que se abre o una hoja corrediza. */
 export interface AnimacionEscena {
-  tipo: "cajon" | "puerta";
+  tipo: "cajon" | "puerta" | "giro";
   mod: number | null;
+  /** Dirección del desplazamiento o, en `giro`, eje de la bisagra. */
   eje: [number, number, number];
-  /** Recorrido de apertura en mm. */
+  /** Punto del eje de la bisagra (solo `giro`). */
+  pivote?: [number, number, number];
+  /** Recorrido de apertura en mm (en `giro`: ángulo en grados). */
   dist: number;
 }
 

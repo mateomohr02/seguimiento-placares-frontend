@@ -101,11 +101,15 @@ function construirGrupos(escena: Escena3D) {
   /** Materiales que esperan una textura, por clave "catálogo/código". */
   const porClave = new Map<string, THREE.MeshLambertMaterial[]>();
   const cacheMat = new Map<string, THREE.MeshLambertMaterial>();
-  const matDe = (clave: string | null, color: THREE.Color, doble = false, rejilla = false) => {
-    const k = `${clave ?? ""}|${color.getHexString()}|${doble}|${rejilla}`;
+  const matDe = (clave: string | null, color: THREE.Color, doble = false, rejilla = false, opacidad = 1) => {
+    const k = `${clave ?? ""}|${color.getHexString()}|${doble}|${rejilla}|${opacidad}`;
     let m = cacheMat.get(k);
     if (!m) {
-      m = new THREE.MeshLambertMaterial({ color, side: doble ? THREE.DoubleSide : THREE.FrontSide });
+      m = new THREE.MeshLambertMaterial({
+        color,
+        side: doble || opacidad < 1 ? THREE.DoubleSide : THREE.FrontSide,
+        ...(opacidad < 1 ? { transparent: true, opacity: opacidad, depthWrite: false } : {}),
+      });
       // Revestimiento de baldosas: la textura entera cubre una baldosa y se marcan las juntas.
       if (rejilla) m.userData.rejilla = true;
       cacheMat.set(k, m);
@@ -119,7 +123,11 @@ function construirGrupos(escena: Escena3D) {
   mats.push(matBorde);
 
   // Un grupo por cajón / hoja corrediza: se desplaza como un todo.
-  const anims: Animable[] = escena.animaciones.map((def) => ({ grupo: new THREE.Group(), def, t: 0, objetivo: 0 }));
+  const anims: Animable[] = escena.animaciones.map((def) => {
+    const grupo = new THREE.Group();
+    if (def.tipo === "giro") grupo.matrixAutoUpdate = false;
+    return { grupo, def, t: 0, objetivo: 0 };
+  });
   const animAgregado = new Set<number>();
 
   for (const c of escena.cajas) {
@@ -128,7 +136,7 @@ function construirGrupos(escena: Escena3D) {
     escalarUvCaja(g, c.s[0], c.s[1], c.s[2], TILE_MUEBLE_MM);
     geoms.push(g);
     const cat = c.k ?? catalogoDe.get(c.mod ?? -1) ?? "4";
-    const mat = matDe(c.m ? `${cat}/${c.m}` : null, colorCaja(c.m, c.c));
+    const mat = matDe(c.m ? `${cat}/${c.m}` : null, colorCaja(c.m, c.c), false, false, c.o ?? 1);
     const mesh = new THREE.Mesh(g, mat);
     if (c.a !== undefined) mesh.userData.anim = c.a;
     const borde = new THREE.LineSegments(new THREE.EdgesGeometry(g), matBorde);
@@ -224,7 +232,16 @@ function avanzarAnimaciones(grupos: Grupos, dt: number): boolean {
     const paso = dt / DURACION_MS;
     a.t = a.objetivo > a.t ? Math.min(a.objetivo, a.t + paso) : Math.max(a.objetivo, a.t - paso);
     const k = suavizar(a.t) * a.def.dist;
-    a.grupo.position.set(a.def.eje[0] * k, a.def.eje[1] * k, a.def.eje[2] * k);
+    if (a.def.tipo === "giro" && a.def.pivote) {
+      // Puerta con bisagra: gira k grados sobre el eje que pasa por el pivote.
+      const [px, py, pz] = a.def.pivote;
+      const eje = new THREE.Vector3(...a.def.eje).normalize();
+      a.grupo.matrix
+        .makeTranslation(px, py, pz)
+        .multiply(new THREE.Matrix4().makeRotationAxis(eje, (k * Math.PI) / 180))
+        .multiply(new THREE.Matrix4().makeTranslation(-px, -py, -pz));
+      a.grupo.matrixWorldNeedsUpdate = true;
+    } else a.grupo.position.set(a.def.eje[0] * k, a.def.eje[1] * k, a.def.eje[2] * k);
     if (a.t !== a.objetivo) activo = true;
   }
   return activo;
@@ -272,9 +289,14 @@ export function EscenaVisor({
   // Hoja de puerta abierta: 0 = todas cerradas, n = se abrió la hoja n.
   const [puertaAbierta, setPuertaAbierta] = useState(0);
   const [cajonesAbiertos, setCajonesAbiertos] = useState(false);
+  const [batientesAbiertas, setBatientesAbiertas] = useState(false);
 
   const puertas = useMemo(
     () => escena.animaciones.flatMap((a, i) => (a.tipo === "puerta" ? [i] : [])),
+    [escena.animaciones],
+  );
+  const batientes = useMemo(
+    () => escena.animaciones.flatMap((a, i) => (a.tipo === "giro" ? [i] : [])),
     [escena.animaciones],
   );
   const cajones = useMemo(
@@ -466,6 +488,11 @@ export function EscenaVisor({
     setPuertaAbierta(siguiente);
     api.current?.mover(puertas, (i) => puertas.indexOf(i) === siguiente - 1);
   }
+  function alternarBatientes() {
+    const abrir = !batientesAbiertas;
+    setBatientesAbiertas(abrir);
+    api.current?.mover(batientes, () => abrir);
+  }
   function alternarCajones() {
     const abrir = !cajonesAbiertos;
     setCajonesAbiertos(abrir);
@@ -495,6 +522,16 @@ export function EscenaVisor({
             className="h-11 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-muted"
           >
             {etiquetaPuertas}
+          </button>
+        )}
+        {batientes.length > 0 && (
+          <button
+            type="button"
+            onClick={alternarBatientes}
+            className="h-11 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-muted"
+          >
+            {batientesAbiertas ? "Cerrar puertas" : "Abrir puertas"}
+            {puertas.length > 0 ? " batientes" : ""}
           </button>
         )}
         {cajones.length > 0 && (
