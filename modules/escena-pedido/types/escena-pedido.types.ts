@@ -21,6 +21,8 @@ export interface CajaEscena {
   o?: number;
   /** Catálogo de la pieza si no es el 4 (ej. 658 = puertas): dónde buscar su textura. */
   k?: string;
+  /** Foto de paisaje (PSJ): la imagen entera cubre la cara y se ve sin sombras. */
+  p?: 1;
 }
 
 /** Malla de triángulos (cortinas, barandas, tubos…). */

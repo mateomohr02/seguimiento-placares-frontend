@@ -155,10 +155,11 @@ function construirGrupos(escena: Escena3D) {
   for (const c of escena.cajas) {
     const g = new THREE.BoxGeometry(c.s[0], c.s[1], c.s[2]);
     g.translate(c.s[0] / 2, c.s[1] / 2, c.s[2] / 2);
-    escalarUvCaja(g, c.s[0], c.s[1], c.s[2], TILE_MUEBLE_MM);
+    // Una foto de paisaje (PSJ) cubre la cara una sola vez; el resto repite la textura por medida real.
+    if (c.p !== 1) escalarUvCaja(g, c.s[0], c.s[1], c.s[2], TILE_MUEBLE_MM);
     geoms.push(g);
     const cat = c.k ?? catalogoDe.get(c.mod ?? -1) ?? "4";
-    const mat = matDe(c.m ? `${cat}/${c.m}` : null, colorCaja(c.m, c.c), false, false, c.o ?? 1);
+    const mat = matDe(c.m ? `${cat}/${c.m}` : null, colorCaja(c.m, c.c), false, false, c.o ?? 1, c.p === 1);
     const mesh = new THREE.Mesh(g, mat);
     if (c.a !== undefined) mesh.userData.anim = c.a;
     const borde = new THREE.LineSegments(new THREE.EdgesGeometry(g), matBorde);
