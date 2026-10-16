@@ -19,6 +19,17 @@ const COLOR_MATERIAL: Record<string, string> = {
   AA: "#b4b3b3",
   "<5002>metall": "#9a9ea3",
   "esfera-gris-clara": "#f0f0f0", // tiradores
+  // Encimeras, vidrios y metales de las cocinas (catálogos 636, 637, 658): respaldo si falta la textura.
+  ICONIW: "#f4f4f2",
+  GRPE: "#d8d4cc",
+  ESPEJO: "#b4c3de",
+  VIDRIO: "#b4c3de",
+  TRANSPA: "#c8d4e4",
+  VIMAT: "#d8dde4",
+  esfera1: "#c9ccd0",
+  esfera2: "#b8bcc2",
+  "esfera-gris": "#b8bcc2",
+  brillonegro3: "#1a1a1a",
 };
 const COLOR_DEFECTO = "#d6d2c8";
 const COLOR_PARED = "#d2d2d0";
@@ -86,6 +97,8 @@ function texturaConJuntas(tex: THREE.Texture, lista: THREE.Texture[]): THREE.Tex
   return t;
 }
 
+type MatVisor = THREE.MeshLambertMaterial | THREE.MeshBasicMaterial | THREE.MeshMatcapMaterial;
+
 interface Animable {
   grupo: THREE.Group;
   def: AnimacionEscena;
@@ -102,8 +115,8 @@ function construirGrupos(escena: Escena3D) {
   const geoms: THREE.BufferGeometry[] = [];
   const mats: THREE.Material[] = [];
   /** Materiales que esperan una textura, por clave "catálogo/código". */
-  const porClave = new Map<string, (THREE.MeshLambertMaterial | THREE.MeshBasicMaterial)[]>();
-  const cacheMat = new Map<string, THREE.MeshLambertMaterial | THREE.MeshBasicMaterial>();
+  const porClave = new Map<string, MatVisor[]>();
+  const cacheMat = new Map<string, MatVisor>();
   const matDe = (clave: string | null, color: THREE.Color, doble = false, rejilla = false, opacidad = 1, sinLuz = false) => {
     const k = `${clave ?? ""}|${color.getHexString()}|${doble}|${rejilla}|${opacidad}|${sinLuz}`;
     let m = cacheMat.get(k);
@@ -113,7 +126,12 @@ function construirGrupos(escena: Escena3D) {
         side: doble || opacidad < 1 ? THREE.DoubleSide : THREE.FrontSide,
         ...(opacidad < 1 ? { transparent: true, opacity: opacidad, depthWrite: false } : {}),
       };
-      m = sinLuz ? new THREE.MeshBasicMaterial(params) : new THREE.MeshLambertMaterial(params);
+      // Los materiales `esfera…` son la foto de una bola cromada (matcap), no una textura que se repite.
+      m = sinLuz
+        ? new THREE.MeshBasicMaterial(params)
+        : clave && /\/esfera/i.test(clave)
+          ? new THREE.MeshMatcapMaterial(params)
+          : new THREE.MeshLambertMaterial(params);
       // Revestimiento de baldosas: la textura entera cubre una baldosa y se marcan las juntas.
       if (rejilla) m.userData.rejilla = true;
       cacheMat.set(k, m);
@@ -281,7 +299,7 @@ function construirGrupos(escena: Escena3D) {
       ),
     );
     geoms.push(g);
-    pared.add(new THREE.Mesh(g, matDe(w.m ? `641/${w.m}` : null, new THREE.Color(COLOR_PARED), false, !!w.m && !!w.t && w.t[0] <= TILE_JUNTAS_MAX_MM)));
+    pared.add(new THREE.Mesh(g, matDe(w.m ? `641/${w.m}` : null, new THREE.Color(COLOR_PARED), w.d === 1, !!w.m && !!w.t && w.t[0] <= TILE_JUNTAS_MAX_MM)));
   }
   return { porModulo, modulos, entorno, pared, anims, porClave, geoms, mats };
 }
@@ -519,7 +537,8 @@ export function EscenaVisor({
           let conJuntas: THREE.Texture | null = null;
           for (const m of matsClave) {
             if (m.userData.rejilla) conJuntas ??= texturaConJuntas(tex, texturas);
-            m.map = m.userData.rejilla && conJuntas ? conJuntas : tex;
+            if (m instanceof THREE.MeshMatcapMaterial) m.matcap = tex;
+            else m.map = m.userData.rejilla && conJuntas ? conJuntas : tex;
             m.color.set(0xffffff);
             m.needsUpdate = true;
           }
