@@ -10,6 +10,8 @@ import { PedidoNav } from "@/modules/pedido/components/pedido-nav";
 import { TIPOS_OBLIGATORIOS } from "@/modules/documento-pedido/types/documento-pedido.types";
 import { DocumentacionPedido } from "@/modules/documento-pedido/components/documentacion-pedido";
 import { PlanosPedido } from "@/modules/plano-pedido/components/planos-pedido";
+import { EscenasPedido } from "@/modules/escena-pedido/components/escenas-pedido";
+import type { EscenaPedido } from "@/modules/escena-pedido/types/escena-pedido.types";
 import type { PlanoPedido } from "@/modules/plano-pedido/types/plano-pedido.types";
 import type { DocumentoPedido } from "@/modules/documento-pedido/types/documento-pedido.types";
 
@@ -20,11 +22,12 @@ export default async function PedidoDetallePage({
 }) {
   const { id } = await params;
   const puedeGestionar = puede(await requireSesion(), PERMISOS.DOCUMENTACION_GESTIONAR);
-  const [pedido, modulos, documentos, planos] = await Promise.all([
+  const [pedido, modulos, documentos, planos, escenas] = await Promise.all([
     apiFetch<PedidoConOrden>(`/pedidos/${id}`),
     apiFetch<Modulo[]>(`/pedidos/${id}/modulos`),
     apiFetch<DocumentoPedido[]>(`/pedidos/${id}/documentos`),
     apiFetch<PlanoPedido[]>(`/pedidos/${id}/planos`),
+    apiFetch<EscenaPedido[]>(`/pedidos/${id}/escenas`),
   ]);
 
   return (
@@ -49,6 +52,7 @@ export default async function PedidoDetallePage({
             alerta: TIPOS_OBLIGATORIOS.some((t) => !documentos.some((d) => d.tipo === t)),
           },
           { id: "planos", label: "Planos", count: planos.length },
+          { id: "escenas", label: "Escenas 3D", count: escenas.length },
         ]}
       />
 
@@ -65,6 +69,8 @@ export default async function PedidoDetallePage({
       />
 
       <PlanosPedido pedidoId={id} planos={planos} modulos={modulos} puedeGestionar={puedeGestionar} />
+
+      <EscenasPedido pedidoId={id} escenas={escenas} puedeGestionar={puedeGestionar} />
     </main>
   );
 }
