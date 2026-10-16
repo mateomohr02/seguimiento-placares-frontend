@@ -29,6 +29,9 @@ const COLOR_SUELO = "#d9d9d9"; // piso sin material: TeoWin lo muestra gris clar
 const TILE_MUEBLE_MM = 1200;
 const TILE_DECO_MM = 1000;
 
+// Las juntas se marcan solo en baldosas chicas (cerámicos); un revestimiento de 1500 o 2500 mm se ve continuo, como en TeoWin.
+const TILE_JUNTAS_MAX_MM = 600;
+
 const DURACION_MS = 550;
 
 function colorCaja(m: string, c: [number, number, number] | null): THREE.Color {
@@ -99,17 +102,18 @@ function construirGrupos(escena: Escena3D) {
   const geoms: THREE.BufferGeometry[] = [];
   const mats: THREE.Material[] = [];
   /** Materiales que esperan una textura, por clave "catálogo/código". */
-  const porClave = new Map<string, THREE.MeshLambertMaterial[]>();
-  const cacheMat = new Map<string, THREE.MeshLambertMaterial>();
-  const matDe = (clave: string | null, color: THREE.Color, doble = false, rejilla = false, opacidad = 1) => {
-    const k = `${clave ?? ""}|${color.getHexString()}|${doble}|${rejilla}|${opacidad}`;
+  const porClave = new Map<string, (THREE.MeshLambertMaterial | THREE.MeshBasicMaterial)[]>();
+  const cacheMat = new Map<string, THREE.MeshLambertMaterial | THREE.MeshBasicMaterial>();
+  const matDe = (clave: string | null, color: THREE.Color, doble = false, rejilla = false, opacidad = 1, sinLuz = false) => {
+    const k = `${clave ?? ""}|${color.getHexString()}|${doble}|${rejilla}|${opacidad}|${sinLuz}`;
     let m = cacheMat.get(k);
     if (!m) {
-      m = new THREE.MeshLambertMaterial({
+      const params = {
         color,
         side: doble || opacidad < 1 ? THREE.DoubleSide : THREE.FrontSide,
         ...(opacidad < 1 ? { transparent: true, opacity: opacidad, depthWrite: false } : {}),
-      });
+      };
+      m = sinLuz ? new THREE.MeshBasicMaterial(params) : new THREE.MeshLambertMaterial(params);
       // Revestimiento de baldosas: la textura entera cubre una baldosa y se marcan las juntas.
       if (rejilla) m.userData.rejilla = true;
       cacheMat.set(k, m);
@@ -163,6 +167,44 @@ function construirGrupos(escena: Escena3D) {
     } else grupo.add(obj);
   }
 
+  // Mallas de triángulos (cortinas, barandas, tubos, vidrios…): doble cara, con los UV del .3d.
+  for (const mm of escena.mallas ?? []) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(mm.v, 3));
+    if (mm.uv) g.setAttribute("uv", new THREE.Float32BufferAttribute(mm.uv, 2));
+    g.setIndex(mm.i);
+    // Piezas chicas (cajas, tubos) con aristas vivas; las grandes (cortinas) con normales suavizadas.
+    const liso = mm.v.length / 3 > 120;
+    const geo = liso ? g : g.toNonIndexed();
+    if (!liso) g.dispose();
+    geo.computeVertexNormals();
+    geoms.push(geo);
+    const cat = mm.k ?? catalogoDe.get(mm.mod ?? -1) ?? "4";
+    const mat = matDe(mm.m ? `${cat}/${mm.m}` : null, colorCaja(mm.m, mm.c), true, false, mm.o ?? 1, mm.e === 1);
+    const mesh = new THREE.Mesh(geo, mat);
+    if (mm.a !== undefined) mesh.userData.anim = mm.a;
+    const obj = new THREE.Group();
+    obj.add(mesh);
+    const r = mm.r;
+    obj.matrixAutoUpdate = false;
+    obj.matrix.set(r[0], r[1], r[2], mm.t[0], r[3], r[4], r[5], mm.t[1], r[6], r[7], r[8], mm.t[2], 0, 0, 0, 1);
+    const id = mm.mod ?? -1;
+    let grupo = porModulo.get(id);
+    if (!grupo) {
+      grupo = new THREE.Group();
+      porModulo.set(id, grupo);
+      modulos.add(grupo);
+    }
+    const anim = mm.a !== undefined ? anims[mm.a] : undefined;
+    if (anim) {
+      if (!animAgregado.has(mm.a!)) {
+        animAgregado.add(mm.a!);
+        grupo.add(anim.grupo);
+      }
+      anim.grupo.add(obj);
+    } else grupo.add(obj);
+  }
+
   // Suelo: el contorno sale de las paredes interiores (x, z).
   const entorno = new THREE.Group();
   if (escena.suelo.length >= 3) {
@@ -174,7 +216,7 @@ function construirGrupos(escena: Escena3D) {
     g.rotateX(-Math.PI / 2);
     geoms.push(g);
     const clave = escena.materialSuelo ? `641/${escena.materialSuelo}` : null;
-    entorno.add(new THREE.Mesh(g, matDe(clave, new THREE.Color(COLOR_SUELO), true, !!clave && !!escena.sueloTile)));
+    entorno.add(new THREE.Mesh(g, matDe(clave, new THREE.Color(COLOR_SUELO), true, !!clave && !!escena.sueloTile && escena.sueloTile[0] <= TILE_JUNTAS_MAX_MM)));
   }
 
   // Paredes: solo la cara interior, con su normal hacia el centro del cuarto
@@ -239,7 +281,7 @@ function construirGrupos(escena: Escena3D) {
       ),
     );
     geoms.push(g);
-    pared.add(new THREE.Mesh(g, matDe(w.m ? `641/${w.m}` : null, new THREE.Color(COLOR_PARED), false, !!w.m && !!w.t)));
+    pared.add(new THREE.Mesh(g, matDe(w.m ? `641/${w.m}` : null, new THREE.Color(COLOR_PARED), false, !!w.m && !!w.t && w.t[0] <= TILE_JUNTAS_MAX_MM)));
   }
   return { porModulo, modulos, entorno, pared, anims, porClave, geoms, mats };
 }
@@ -291,7 +333,7 @@ const visibleEnCadena = (o: THREE.Object3D | null) => {
 };
 
 interface Api {
-  encuadrar: (mod: number | null) => void;
+  encuadrar: (mod: number | null, frontal?: boolean) => void;
   grupos: Grupos;
   mover: (indices: number[], abrir: (i: number) => boolean) => void;
   alternar: (i: number) => void;
@@ -354,8 +396,8 @@ export function EscenaVisor({
     renderer.domElement.style.touchAction = "none";
 
     const scene = new THREE.Scene();
-    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
-    const sol = new THREE.DirectionalLight(0xffffff, 0.3);
+    scene.add(new THREE.AmbientLight(0xffffff, 2.3));
+    const sol = new THREE.DirectionalLight(0xffffff, 0.8);
     sol.position.set(-1500, 4000, 2500);
     scene.add(sol);
     scene.add(grupos.entorno, grupos.pared, grupos.modulos);
@@ -380,7 +422,7 @@ export function EscenaVisor({
     ro.observe(el);
 
     // Encuadra lo visible: un módulo aislado o toda la escena.
-    const encuadrar = (mod: number | null) => {
+    const encuadrar = (mod: number | null, frontal = false) => {
       const caja = new THREE.Box3();
       const objetivo = mod !== null ? grupos.porModulo.get(mod) : undefined;
       if (objetivo) caja.setFromObject(objetivo);
@@ -400,8 +442,11 @@ export function EscenaVisor({
       f.normalize();
       const lado = new THREE.Vector3(0, 1, 0).cross(f); // a la derecha de quien mira al mueble
       // Escena completa: más desde arriba, para ver el interior de la sala (las paredes son de una cara).
-      const dir = f.clone().add(lado.multiplyScalar(0.45)).add(new THREE.Vector3(0, m ? 0.55 : 1.1, 0)).normalize();
-      camera.position.copy(centro).add(dir.multiplyScalar(dist));
+      // Vista frontal: de frente y a la altura de la vista, como el editor de TeoWin.
+      const dir = frontal
+        ? f.clone().add(new THREE.Vector3(0, 0.12, 0)).normalize()
+        : f.clone().add(lado.multiplyScalar(0.45)).add(new THREE.Vector3(0, m ? 0.55 : 1.1, 0)).normalize();
+      camera.position.copy(centro).add(dir.multiplyScalar(frontal ? dist * 0.7 : dist));
       controls.target.copy(centro);
       camera.near = Math.max(dist / 200, 1);
       camera.far = dist * 20;
@@ -584,6 +629,13 @@ export function EscenaVisor({
           />
           Paredes
         </label>
+        <button
+          type="button"
+          onClick={() => api.current?.encuadrar(seleccion, true)}
+          className="h-11 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-muted"
+        >
+          Vista frontal
+        </button>
         <button
           type="button"
           onClick={() => api.current?.encuadrar(seleccion)}

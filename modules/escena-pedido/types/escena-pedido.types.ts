@@ -23,6 +23,26 @@ export interface CajaEscena {
   k?: string;
 }
 
+/** Malla de triángulos (cortinas, barandas, tubos…). */
+export interface MallaEscena {
+  mod: number | null;
+  m: string;
+  c: [number, number, number] | null;
+  t: [number, number, number];
+  r: number[];
+  /** Vértices x,y,z consecutivos. */
+  v: number[];
+  /** Triángulos: 3 índices por cara. */
+  i: number[];
+  /** Coordenadas de textura u,v por vértice. */
+  uv?: number[];
+  a?: number;
+  o?: number;
+  k?: string;
+  /** Sin iluminación (fotos de paisaje). */
+  e?: 1;
+}
+
 export interface ParedEscena {
   lado: "int" | "ext";
   p: [number, number, number][];
@@ -63,6 +83,8 @@ export interface Escena3D {
   cabecera: { pedido: string | null; version3d: string | null };
   modulos: ModuloEscena[];
   cajas: CajaEscena[];
+  /** Mallas de triángulos (escenas interpretadas con la versión 15 o posterior). */
+  mallas?: MallaEscena[];
   paredes: ParedEscena[];
   animaciones: AnimacionEscena[];
   materialSuelo: string | null;
