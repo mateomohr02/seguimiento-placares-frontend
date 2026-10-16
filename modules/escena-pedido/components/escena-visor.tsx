@@ -151,6 +151,11 @@ function construirGrupos(escena: Escena3D) {
     return { grupo, def, t: 0, objetivo: 0 };
   });
   const animAgregado = new Set<number>();
+  // Hojas guardadas abiertas en el .3d: se muestran cerradas desde el principio.
+  for (const a of anims) {
+    const ini = a.def.ini;
+    if (ini && a.def.tipo !== "giro") a.grupo.position.set(a.def.eje[0] * ini, a.def.eje[1] * ini, a.def.eje[2] * ini);
+  }
 
   for (const c of escena.cajas) {
     const g = new THREE.BoxGeometry(c.s[0], c.s[1], c.s[2]);
@@ -323,7 +328,8 @@ function avanzarAnimaciones(grupos: Grupos, dt: number): boolean {
     if (a.t === a.objetivo) continue;
     const paso = dt / DURACION_MS;
     a.t = a.objetivo > a.t ? Math.min(a.objetivo, a.t + paso) : Math.max(a.objetivo, a.t - paso);
-    const k = suavizar(a.t) * a.def.dist;
+    const ini = a.def.ini ?? 0;
+    const k = ini + (a.def.dist - ini) * suavizar(a.t);
     if (a.def.tipo === "giro" && a.def.pivote) {
       // Puerta con bisagra: gira k grados sobre el eje que pasa por el pivote.
       const [px, py, pz] = a.def.pivote;

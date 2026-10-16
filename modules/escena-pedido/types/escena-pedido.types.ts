@@ -77,6 +77,8 @@ export interface AnimacionEscena {
   eje: [number, number, number];
   /** Punto del eje de la bisagra (solo `giro`). */
   pivote?: [number, number, number];
+  /** Desplazamiento inicial en mm: la hoja se guardó abierta y se muestra cerrada (parte de `ini` y llega a `dist`). */
+  ini?: number;
   /** Recorrido de apertura en mm (en `giro`: ángulo en grados). */
   dist: number;
 }
