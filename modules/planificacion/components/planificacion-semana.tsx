@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmActionButton } from "@/components/confirm-action-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fechaCorta } from "@/modules/planilla/lib/estaciones";
+import { colorDe, textoSobre } from "../lib/colores";
 import { eliminarItemAction, marcarEstadoAction } from "../actions/planificacion.actions";
 import { ETIQUETA_TIPO, type ItemPlanificacion, type SemanaPlanificacion, type TipoPlanificacion } from "../types/planificacion.types";
 import { ItemDialog } from "./item-dialog";
@@ -21,15 +22,19 @@ function Estados({ item, data }: { item: ItemPlanificacion; data: SemanaPlanific
   const mio = data.mi_estado;
   const marcadoPorMi = mio ? item.marcas.some((m) => m.estado_id === mio.id) : false;
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-col items-start gap-1.5">
       {item.marcas.map((m) => (
-        <span
-          key={m.estado_id}
-          title={`${m.marcado_por} · ${hora.format(new Date(m.marcado_en))}`}
-          className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-medium whitespace-nowrap text-primary-foreground"
-        >
-          <CheckIcon className="size-3.5" /> {m.estado}
-        </span>
+        <div key={m.estado_id} className="flex flex-col items-start leading-tight">
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap"
+            style={{ backgroundColor: colorDe(m.color), color: textoSobre(colorDe(m.color)) }}
+          >
+            <CheckIcon className="size-3.5" /> {m.estado}
+          </span>
+          <span className="pt-0.5 pl-1 text-xs text-muted-foreground">
+            {hora.format(new Date(m.marcado_en))} · {m.marcado_por}
+          </span>
+        </div>
       ))}
       {mio && (
         <ConfirmActionButton
@@ -135,7 +140,7 @@ function Tabla({ tipo, data, puedeGestionar }: { tipo: TipoPlanificacion; data: 
             {filas.map((i) => {
               const completo = data.estados.length > 0 && data.estados.every((e) => i.marcas.some((m) => m.estado_id === e.id));
               return (
-                <TableRow key={i.id} className={completo ? "bg-emerald-100 dark:bg-emerald-950/50" : i.marcas.length > 0 ? "bg-emerald-50 dark:bg-emerald-950/30" : undefined}>
+                <TableRow key={i.id} style={i.marcas.length > 0 ? { backgroundColor: `${colorDe(i.marcas[i.marcas.length - 1].color)}${completo ? "2e" : "1a"}` } : undefined}>
                   <TableCell className="min-w-40 font-medium">{v(i.cliente)}</TableCell>
                   {reclamos && <TableCell>{v(i.distribuidor)}</TableCell>}
                   {reclamos && <TableCell className="whitespace-nowrap">{v(i.ticket)}</TableCell>}

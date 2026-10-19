@@ -138,6 +138,8 @@ export interface OperariosArea {
 export interface EstadoProduccion {
   id: string;
   nombre: string;
+  /** #rrggbb con el que se ve el estado en la planificación. */
+  color: string | null;
   usuarios: number;
   marcas: number;
 }

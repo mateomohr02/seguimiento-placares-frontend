@@ -420,7 +420,7 @@ Parte diario digital de las tres subestaciones, en el orden del proceso: **Lijad
 
 La oficina técnica **carga a mano** cada semana los **pedidos** (cliente, N° TW, N° orden, modelo, color, fábrica, fecha límite) y los **reclamos** (cliente, distribuidor, ticket, N° TW, tipo, color, compromiso, finalizado, observaciones). Todos los usuarios la ven en `/planificacion` (la semana actual primero; flechas para cambiar de semana y lista de las que tienen datos).
 
-- **Marcar estados**: a cada usuario de fábrica, técnica le asigna un **estado de producción** (ej. «Listo Termolaminado»; varios usuarios pueden compartir el mismo). En cada fila, junto al N° TW, el usuario toca **Marcar «…»** cuando el pedido terminó en su estación (pide confirmación) y **Quitar marca** para deshacerlo. Una fila muestra los estados marcados (al tocarlos/posar el cursor, quién y cuándo) y se tiñe de verde. Sin estado asignado se ve la planificación pero no se puede marcar.
+- **Marcar estados**: a cada usuario de fábrica, técnica le asigna un **estado de producción** (ej. «Listo Termolaminado»; varios usuarios pueden compartir el mismo). En cada fila, junto al N° TW, el usuario toca **Marcar «…»** cuando el pedido terminó en su estación (pide confirmación) y **Quitar marca** para deshacerlo. Cada fila muestra los estados marcados con su **color**, y debajo de cada etiqueta **la fecha, la hora y quién lo marcó**; la fila se tiñe con el color del último estado marcado. Sin estado asignado se ve la planificación pero no se puede marcar.
 - **Técnica** (permiso `documentacion.gestionar`) además **agrega, edita y quita** filas (botones **Agregar**, lápiz y cesto).
 
 ### Registros, indicadores y trazabilidad (`planillas.ver`)
@@ -428,7 +428,7 @@ La oficina técnica **carga a mano** cada semana los **pedidos** (cliente, N° T
 - **Registros**: tabla cruda de todo lo cargado, con filtros (fechas —por defecto los últimos 30 días—, estación, estado y pedido), cantidad de **fotos** por registro y enlaces al **detalle** de la planilla (ítems, fotos ampliables, historial de correcciones). Tocar un N° de pedido abre su trazabilidad.
 - **Indicadores**: por estación (piezas, pedidos, días con carga, tiempo trabajado, piezas por hora), piezas por día y la situación de los pedidos del período (los que pasaron por las tres estaciones, los que faltan y los que tienen **cantidad de piezas distinta** entre estaciones). Incluyen también los borradores.
 - **Trazabilidad de un pedido** (`/planillas/trazabilidad?pedido=`): por qué estaciones pasó, cuándo y cuántas piezas en cada una.
-- **Configurar** (`planillas.configurar`, técnica): el catálogo de **estados de producción** y, para cada usuario de fábrica, su **estado**, las **planillas que completa** y los **operarios** de su estación (en cada planilla se eligen a mano). Cada cambio se guarda al instante; el usuario lo ve al recargar la página.
+- **Configurar** (`planillas.configurar`, técnica): el catálogo de **estados de producción** (con el **color** de cada uno: paleta o selector libre) y, para cada usuario de fábrica, su **estado**, las **planillas que completa** y los **operarios** de su estación (en cada planilla se eligen a mano). Cada cambio se guarda al instante; el usuario lo ve al recargar la página.
 
 ---
 

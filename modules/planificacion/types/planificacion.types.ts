@@ -9,6 +9,7 @@ export const ETIQUETA_TIPO: Record<TipoPlanificacion, string> = {
 export interface MarcaPlanificacion {
   estado_id: string;
   estado: string;
+  color: string | null;
   marcado_por: string;
   marcado_en: string;
 }
@@ -37,6 +38,7 @@ export interface ItemPlanificacion {
 export interface EstadoBasico {
   id: string;
   nombre: string;
+  color: string | null;
 }
 
 export interface SemanaPlanificacion {
