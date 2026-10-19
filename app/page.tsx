@@ -2,8 +2,6 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api/api-client";
 import { requireSesion } from "@/lib/auth/sesion";
 import { PERMISOS, puede } from "@/lib/auth/permisos";
-import { LogoNeostone } from "@/components/logo-neostone";
-import { UsuarioMenu } from "@/components/usuario-menu";
 import { Button } from "@/components/ui/button";
 import { AgregarOrdenDialog } from "@/modules/orden/components/agregar-orden-dialog";
 import { OrdenesTable } from "@/modules/orden/components/ordenes-table";
@@ -22,10 +20,6 @@ export default async function OrdenesPage({
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10">
-      <div className="flex items-center justify-between gap-4">
-        <LogoNeostone className="w-36 sm:w-44" />
-        <UsuarioMenu />
-      </div>
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold">

@@ -57,6 +57,7 @@
      carbón (#1A1A1A, encabezados/botones), bronce (#9C7A4C, acento), beige
      cálido (#F4F2EF, bandas de tabla) y grises cálidos para texto/bordes.
      Tema claro: fondo blanco, letra oscura. */
+  --barra-h: 5.75rem; /* alto de la barra de navegación: dos filas en celular (pantallas completas lo descuentan) */
   --background: #ffffff;
   --foreground: #1a1a1a;
   --card: #ffffff;
@@ -90,6 +91,13 @@
   --sidebar-accent-foreground: #1a1a1a;
   --sidebar-border: #e2ded8;
   --sidebar-ring: #9c7a4c;
+}
+
+/* Desde md la barra de navegación es de una sola fila. */
+@media (min-width: 768px) {
+  :root {
+    --barra-h: 3.5rem;
+  }
 }
 
 .dark {
