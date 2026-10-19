@@ -133,3 +133,10 @@ export interface OperariosArea {
   area: string;
   operarios: string[];
 }
+
+export interface AccesoUsuario {
+  id: string;
+  nombre: string;
+  rol: string;
+  estaciones: Estacion[];
+}

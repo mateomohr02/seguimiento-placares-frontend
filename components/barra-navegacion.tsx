@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSesion } from "@/lib/auth/sesion";
-import { PERMISOS, puede, type Sesion } from "@/lib/auth/permisos";
+import { PERMISOS, puede, puedeCompletarPlanilla, type Sesion } from "@/lib/auth/permisos";
 import { LogoNeostone } from "@/components/logo-neostone";
 import { UsuarioMenu } from "@/components/usuario-menu";
 import { NavLinks, type NavGrupo } from "@/components/nav-links";
@@ -11,16 +11,13 @@ import { NavLinks, type NavGrupo } from "@/components/nav-links";
 function gruposDe(sesion: Sesion): NavGrupo[] {
   const grupos: NavGrupo[] = [{ titulo: null, links: [{ href: "/", label: "Órdenes", exacto: true }] }];
 
-  if (puede(sesion, PERMISOS.PLANILLAS_COMPLETAR)) {
-    grupos.push({
-      titulo: "Planillas",
-      links: [
-        { href: "/planillas/lijado", label: "Lijado" },
-        { href: "/planillas/encolado", label: "Encolado" },
-        { href: "/planillas/pvc", label: "PVC" },
-      ],
-    });
-  }
+  // Solo las planillas que técnica le asignó al usuario (en el orden del proceso).
+  const planillas = [
+    { href: "/planillas/lijado", label: "Lijado", estacion: "LIJADO" },
+    { href: "/planillas/encolado", label: "Encolado", estacion: "ENCOLADO" },
+    { href: "/planillas/pvc", label: "PVC", estacion: "PVC" },
+  ].filter((p) => puedeCompletarPlanilla(sesion, p.estacion));
+  if (planillas.length > 0) grupos.push({ titulo: "Planillas", links: planillas });
 
   const termolaminado = [];
   if (puede(sesion, PERMISOS.DOCUMENTACION_VER) && puede(sesion, PERMISOS.PLANILLAS_VER)) {
@@ -31,7 +28,7 @@ function gruposDe(sesion: Sesion): NavGrupo[] {
     termolaminado.push({ href: "/planillas/registros", label: "Registros" });
   }
   if (puede(sesion, PERMISOS.PLANILLAS_INDICADORES)) termolaminado.push({ href: "/planillas/indicadores", label: "Indicadores" });
-  if (puede(sesion, PERMISOS.PLANILLAS_CONFIGURAR)) termolaminado.push({ href: "/planillas/operarios", label: "Operarios" });
+  if (puede(sesion, PERMISOS.PLANILLAS_CONFIGURAR)) termolaminado.push({ href: "/planillas/configuracion", label: "Configurar" });
   if (termolaminado.length > 0) grupos.push({ titulo: "Termolaminado", links: termolaminado });
 
   return grupos;

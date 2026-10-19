@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ImageIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api/api-client";
 import { requireSesion } from "@/lib/auth/sesion";
-import { PERMISOS, puede } from "@/lib/auth/permisos";
+import { PERMISOS, puede, puedeCompletarPlanilla } from "@/lib/auth/permisos";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,7 +17,7 @@ export default async function RegistrosPage({ searchParams }: { searchParams: Pr
   const sesion = await requireSesion();
   if (!puede(sesion, PERMISOS.PLANILLAS_VER)) notFound();
 
-  const puedeCompletar = puede(sesion, PERMISOS.PLANILLAS_COMPLETAR);
+
   const f = await searchParams;
   const { desde, hasta } = rangoPorDefecto(hoyLocal(), f.desde, f.hasta);
   const query = new URLSearchParams({ desde, hasta });
@@ -140,7 +140,7 @@ export default async function RegistrosPage({ searchParams }: { searchParams: Pr
                   <Link href={`/planillas/detalle/${r.planilla_id}`} className="text-sm underline-offset-4 hover:underline">
                     Detalle
                   </Link>
-                  {puedeCompletar && (
+                  {puedeCompletarPlanilla(sesion, r.estacion) && (
                     <>
                       {" · "}
                       <Link

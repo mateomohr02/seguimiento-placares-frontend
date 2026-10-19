@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { apiFetch } from "@/lib/api/api-client";
 import { requireSesion } from "@/lib/auth/sesion";
-import { PERMISOS, puede } from "@/lib/auth/permisos";
+import { puedeCompletarPlanilla } from "@/lib/auth/permisos";
 import { ETIQUETA_ESTACION, estacionDeSlug, FECHA_RE, hoyLocal, slugEstacion } from "@/modules/planilla/lib/estaciones";
 import type { OperariosArea, Planilla } from "@/modules/planilla/types/planilla.types";
 import { PlanillaForm } from "@/modules/planilla/components/planilla-form";
@@ -16,7 +16,7 @@ export default async function PlanillaPage({
   const estacion = estacionDeSlug((await params).estacion);
   if (!estacion) notFound();
   const sesion = await requireSesion();
-  if (!puede(sesion, PERMISOS.PLANILLAS_COMPLETAR)) notFound();
+  if (!puedeCompletarPlanilla(sesion, estacion.toUpperCase())) notFound();
 
   const pedida = (await searchParams).fecha;
   const fecha = pedida && FECHA_RE.test(pedida) ? pedida : hoyLocal();

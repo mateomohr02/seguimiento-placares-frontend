@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api/api-client";
 import { requireSesion } from "@/lib/auth/sesion";
-import { PERMISOS, puede } from "@/lib/auth/permisos";
+import { PERMISOS, puede, puedeCompletarPlanilla } from "@/lib/auth/permisos";
 import { Badge } from "@/components/ui/badge";
 import { VolverLink } from "@/components/volver-link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -97,7 +97,7 @@ export default async function DetallePlanillaPage({ params }: { params: Promise<
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={planilla.estado === "GUARDADA" ? "default" : "secondary"}>{planilla.estado === "GUARDADA" ? "Guardada" : "Borrador"}</Badge>
-          {puede(sesion, PERMISOS.PLANILLAS_COMPLETAR) && (
+          {puedeCompletarPlanilla(sesion, planilla.estacion) && (
             <Link
               href={`/planillas/${slugEstacion(planilla.estacion)}?fecha=${planilla.fecha}`}
               className="inline-flex h-10 items-center rounded-lg border px-4 text-sm font-medium hover:bg-muted"

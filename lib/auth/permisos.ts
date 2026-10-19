@@ -21,6 +21,12 @@ export interface Sesion {
   nombre: string;
   rol: string;
   permisos: string[];
+  /** Planillas de Termolaminado que puede completar (las asigna técnica): LIJADO, ENCOLADO, PVC. */
+  planillas: string[];
 }
 
 export const puede = (sesion: Sesion, permiso: Permiso) => sesion.permisos.includes(permiso);
+
+/** ¿Puede completar la planilla de esa estación? Exige el permiso y tenerla asignada. */
+export const puedeCompletarPlanilla = (sesion: Sesion, estacion: string) =>
+  puede(sesion, PERMISOS.PLANILLAS_COMPLETAR) && sesion.planillas.includes(estacion);
