@@ -52,9 +52,9 @@ app/frontend/
 │   ├── pedidos/[id]/escenas/[escenaId]/page.tsx  # Visor 3D de una escena (+ escenas/subir/route.ts, proxy de subida)
 │   ├── texturas-3d/[catalogo]/[material]/route.ts # Route handler: proxy de las texturas de las escenas 3D hacia el backend
 │   ├── hojas-corte/[id]/ · documentos-pedido/[id]/ · planos-pedido/[id]/   # Route handlers: proxys de /archivo y /anotaciones hacia el backend (el navegador no habla con el backend)
-│   ├── planillas/                 # Termolaminado: [estacion]/page.tsx (formulario de Lijado/Encolado/PVC), registros/, indicadores/, trazabilidad/, detalle/[id]/, operarios/
-│   ├── planillas-api/             # Route handlers proxy del formulario (guardado de la planilla, fotos, sugerencias de pedido, operarios)
-│   ├── planificacion/             # Planificación semanal (page.tsx), visor ([id]/page.tsx) y proxys (subir/, [id]/archivo/, [id]/anotaciones/ vacío)
+│   ├── planillas/                 # Termolaminado: [estacion]/page.tsx (formulario de Lijado/Encolado/PVC), registros/, indicadores/, trazabilidad/, detalle/[id]/, configuracion/ (estados, y por usuario: estado, planillas y operarios)
+│   ├── planillas-api/             # Route handlers proxy del formulario (guardado de la planilla, fotos, sugerencias de pedido, configuración por usuario y estados)
+│   ├── planificacion/             # Planificación semanal por sistema: page.tsx (semana con pedidos y reclamos, marcado de estados y alta/edición de filas para técnica)
 │   ├── red/estado/route.ts       # Endpoint que consulta el comprobador de red (responde si el frontend y el backend están vivos)
 │   ├── loading.tsx               # Pantalla de carga (tres puntos) mientras una página pide sus datos
 │   └── layout.tsx                # Estructura común a todas las páginas (fuente, tema, notificaciones)
@@ -68,7 +68,7 @@ app/frontend/
 │   ├── plano-pedido/              # Planos del pedido: carga, miniaturas, listado
 │   ├── escena-pedido/             # Escenas 3D del pedido (.3d de TeoWin), solo lectura: listado, carga, eliminar y visor three.js (components/escena-visor.tsx)
 │   ├── planilla/                  # Planillas de Termolaminado: formulario con borrador automático (planilla-form.tsx), fotos de PVC (fotos-fila.tsx), operarios, filtros, tipos
-│   ├── planificacion/             # Planificación semanal: subir, eliminar, tipos
+│   ├── planificacion/             # Planificación semanal: tabla, diálogo de carga, marcado de estados (server actions) y tipos
 │   └── auth/                       # Login por PIN: acción de login/logout y pantalla con teclado numérico
 ├── components/
 │   ├── barra-navegacion.tsx       # Barra superior global (en el layout, con sesión): enlaces según permisos + usuario; nav-links.tsx resalta la página actual. Alto fijo `--barra-h` (globals.css): las pantallas completas (visores, escaneo) lo descuentan
@@ -414,18 +414,21 @@ Parte diario digital de las tres subestaciones, en el orden del proceso: **Lijad
 - **Borrador automático**: todo lo que se escribe se guarda solo en el servidor unos instantes después ("Borrador guardado …"); si se cierra la sesión, se apaga la tablet o se recarga la página, **lo cargado sigue ahí**. Mientras tanto la planilla figura como **Borrador**.
 - **Guardar planilla** la cierra (queda **Guardada**). Cada ítem necesita pedido, hora de inicio y cantidad; si falta algo, avisa cuál. Una planilla guardada **se puede corregir**: se editan los datos y se toca **Guardar cambios**; la app conserva la **versión anterior** (quién, cuándo) y se ve en el historial del detalle.
 - **Fotos (solo PVC)**: en cada ítem, **Sacar foto** abre la cámara (o **Elegir de la galería**); se pueden subir varias, se ven como miniaturas, se amplían al tocarlas y se borran con la ×. La foto de la pieza se saca antes de termolaminar. (En un ítem recién agregado, la app lo guarda antes de subir la foto.)
-- **Operarios**: en el encabezado se tocan los que trabajaron en esa planilla (los botones salen de la lista que técnica define en **Configurar**, donde también asigna qué planillas ve cada usuario). Quedan guardados con su nombre: cambiar la lista después no altera la planilla.
+- **Operarios**: en el encabezado se tocan los que trabajaron en esa planilla (los botones son los operarios que técnica le configuró a ese usuario). Quedan guardados con su nombre: cambiar la lista después no altera la planilla.
 
 ### Planificación semanal (`Planificación`)
 
-La oficina técnica sube, por semana, la **planificación de pedidos** y los **reclamos** (PDF o imagen). Todas las estaciones los ven en `/planificacion` (la semana actual primero) y los abren en el visor (zoom, pantalla completa). **Técnica** (permiso `documentacion.gestionar`) además **carga** (tipo, semana, archivo) y **elimina** documentos.
+La oficina técnica **carga a mano** cada semana los **pedidos** (cliente, N° TW, N° orden, modelo, color, fábrica, fecha límite) y los **reclamos** (cliente, distribuidor, ticket, N° TW, tipo, color, compromiso, finalizado, observaciones). Todos los usuarios la ven en `/planificacion` (la semana actual primero; flechas para cambiar de semana y lista de las que tienen datos).
+
+- **Marcar estados**: a cada usuario de fábrica, técnica le asigna un **estado de producción** (ej. «Listo Termolaminado»; varios usuarios pueden compartir el mismo). En cada fila, junto al N° TW, el usuario toca **Marcar «…»** cuando el pedido terminó en su estación (pide confirmación) y **Quitar marca** para deshacerlo. Una fila muestra los estados marcados (al tocarlos/posar el cursor, quién y cuándo) y se tiñe de verde. Sin estado asignado se ve la planificación pero no se puede marcar.
+- **Técnica** (permiso `documentacion.gestionar`) además **agrega, edita y quita** filas (botones **Agregar**, lápiz y cesto).
 
 ### Registros, indicadores y trazabilidad (`planillas.ver`)
 
 - **Registros**: tabla cruda de todo lo cargado, con filtros (fechas —por defecto los últimos 30 días—, estación, estado y pedido), cantidad de **fotos** por registro y enlaces al **detalle** de la planilla (ítems, fotos ampliables, historial de correcciones). Tocar un N° de pedido abre su trazabilidad.
 - **Indicadores**: por estación (piezas, pedidos, días con carga, tiempo trabajado, piezas por hora), piezas por día y la situación de los pedidos del período (los que pasaron por las tres estaciones, los que faltan y los que tienen **cantidad de piezas distinta** entre estaciones). Incluyen también los borradores.
 - **Trazabilidad de un pedido** (`/planillas/trazabilidad?pedido=`): por qué estaciones pasó, cuándo y cuántas piezas en cada una.
-- **Configurar** (`planillas.configurar`, técnica): lista de operarios del área (en cada planilla se eligen a mano) y tabla de **acceso a las planillas** (casillas por usuario y planilla; se guardan al tocarlas).
+- **Configurar** (`planillas.configurar`, técnica): el catálogo de **estados de producción** y, para cada usuario de fábrica, su **estado**, las **planillas que completa** y los **operarios** de su estación (en cada planilla se eligen a mano). Cada cambio se guarda al instante; el usuario lo ve al recargar la página.
 
 ---
 

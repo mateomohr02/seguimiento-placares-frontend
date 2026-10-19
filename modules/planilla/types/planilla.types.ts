@@ -129,14 +129,25 @@ export interface Trazabilidad extends ResumenPedido {
   registros: RegistroTraza[];
 }
 
+/** Operarios entre los que elige el usuario al completar sus planillas (los configura técnica). */
 export interface OperariosArea {
-  area: string;
   operarios: string[];
 }
 
+/** Estado de producción del catálogo (con cuántos usuarios lo tienen y cuántas marcas hizo). */
+export interface EstadoProduccion {
+  id: string;
+  nombre: string;
+  usuarios: number;
+  marcas: number;
+}
+
+/** Configuración de un usuario de fábrica: planillas que completa, estado que marca y operarios de su estación. */
 export interface AccesoUsuario {
   id: string;
   nombre: string;
   rol: string;
   estaciones: Estacion[];
+  estado_id: string | null;
+  operarios: string[];
 }

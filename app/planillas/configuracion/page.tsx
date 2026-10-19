@@ -2,40 +2,40 @@ import { notFound } from "next/navigation";
 import { apiFetch } from "@/lib/api/api-client";
 import { requireSesion } from "@/lib/auth/sesion";
 import { PERMISOS, puede } from "@/lib/auth/permisos";
-import { AccesosForm } from "@/modules/planilla/components/accesos-form";
-import { OperariosForm } from "@/modules/planilla/components/operarios-form";
-import type { AccesoUsuario, OperariosArea } from "@/modules/planilla/types/planilla.types";
+import { EstadosForm } from "@/modules/planilla/components/estados-form";
+import { UsuariosConfig } from "@/modules/planilla/components/usuarios-config";
+import type { AccesoUsuario, EstadoProduccion } from "@/modules/planilla/types/planilla.types";
 
 export default async function ConfiguracionPlanillasPage() {
   const sesion = await requireSesion();
   if (!puede(sesion, PERMISOS.PLANILLAS_CONFIGURAR)) notFound();
-  const [{ operarios }, accesos] = await Promise.all([
-    apiFetch<OperariosArea>("/planillas/operarios"),
+  const [estados, usuarios] = await Promise.all([
+    apiFetch<EstadoProduccion[]>("/planillas/estados"),
     apiFetch<AccesoUsuario[]>("/planillas/accesos"),
   ]);
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-6">
+    <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-6">
       <h1 className="text-xl font-semibold">Configuración de Termolaminado</h1>
 
       <section className="flex flex-col gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Operarios</h2>
+          <h2 className="text-lg font-semibold">Estados de producción</h2>
           <p className="text-sm text-muted-foreground">
-            Esta es la lista de operarios del área: en cada planilla, el usuario elige a mano cuáles trabajaron. Cambiar un nombre acá no modifica las planillas ya creadas (guardan el nombre que tenían).
+            Los estados que se marcan en la planificación cuando un pedido termina en una estación (ej. «Listo Termolaminado»). Después se le asigna uno a cada usuario; varios usuarios pueden compartir el mismo.
           </p>
         </div>
-        <OperariosForm inicial={operarios} />
+        <EstadosForm key={estados.map((e) => e.id).join()} inicial={estados} />
       </section>
 
       <section className="flex flex-col gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Acceso a las planillas</h2>
+          <h2 className="text-lg font-semibold">Usuarios de fábrica</h2>
           <p className="text-sm text-muted-foreground">
-            Elegí qué planillas completa cada usuario. Cada casilla se guarda al tocarla; el usuario ve el cambio al recargar la página. Sin casillas marcadas no ve ninguna planilla.
+            Para cada usuario: su estado de producción, las planillas que completa y los operarios que trabajan en su estación (entre ellos elige al completar una planilla). Cada cambio se guarda al instante; el usuario lo ve al recargar la página. Las planillas ya creadas conservan los nombres de operarios que tenían.
           </p>
         </div>
-        <AccesosForm inicial={accesos} />
+        <UsuariosConfig inicial={usuarios} estados={estados} />
       </section>
     </main>
   );
