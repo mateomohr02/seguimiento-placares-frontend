@@ -93,8 +93,8 @@
   --sidebar-ring: #9c7a4c;
 }
 
-/* Desde md la barra de navegación es de una sola fila. */
-@media (min-width: 768px) {
+/* Desde lg la barra de navegación es de una sola fila. */
+@media (min-width: 1024px) {
   :root {
     --barra-h: 3.5rem;
   }

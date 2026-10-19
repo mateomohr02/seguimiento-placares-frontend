@@ -303,7 +303,7 @@ export function PlanillaForm({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-4 rounded-lg border p-4">
+      <div className="grid grid-cols-[auto_1fr] items-end gap-x-4 gap-y-4 rounded-lg border p-4">
         <div className="flex flex-col gap-1">
           <label htmlFor="planilla-fecha" className="text-sm font-medium">
             Fecha
@@ -316,7 +316,7 @@ export function PlanillaForm({
             className="h-11 w-44"
           />
         </div>
-        <fieldset className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+        <fieldset className="col-span-2 row-start-2 flex min-w-0 flex-col gap-1 text-sm">
           <legend className="font-medium">Operarios</legend>
           {operariosDisponibles.length === 0 ? (
             <span className="text-muted-foreground">Técnica todavía no configuró los operarios del área.</span>
@@ -331,7 +331,7 @@ export function PlanillaForm({
                     role="checkbox"
                     aria-checked={marcado}
                     onClick={() => alternarOperario(n)}
-                    className={`inline-flex h-10 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition active:scale-[0.98] ${
+                    className={`inline-flex h-11 items-center gap-1.5 rounded-full border px-5 text-base font-medium transition active:scale-[0.98] ${
                       marcado ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
                     }`}
                   >
@@ -343,7 +343,7 @@ export function PlanillaForm({
           )}
           <span className="text-xs text-muted-foreground">Tocá los operarios que trabajaron en esta planilla.</span>
         </fieldset>
-        <div className="flex flex-col items-end gap-1 text-sm">
+        <div className="col-start-2 row-start-1 flex flex-col items-end gap-1 text-right text-sm">
           <Badge variant={guardada ? "default" : "secondary"}>{guardada ? "Guardada" : "Borrador"}</Badge>
           <span className="text-xs text-muted-foreground" aria-live="polite">
             {guardando ? (
@@ -405,8 +405,8 @@ export function PlanillaForm({
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
-              <Campo etiqueta="N° de pedido" className="col-span-2 sm:col-span-2">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+              <Campo etiqueta="N° de pedido" className="col-span-2 lg:col-span-2">
                 <Input
                   value={f.pedido_codigo}
                   onChange={(e) => onPedido(f.key, e.target.value)}
@@ -432,7 +432,7 @@ export function PlanillaForm({
                   <Campo etiqueta="Mesa grande">
                     <NumeroInput valor={f.mesa_grande} onChange={(v) => setCampo(f.key, "mesa_grande", v)} />
                   </Campo>
-                  <Campo etiqueta="Colores (código)" className="col-span-2 sm:col-span-2">
+                  <Campo etiqueta="Colores (código)" className="col-span-2 lg:col-span-2">
                     <Input
                       value={f.colores}
                       onChange={(e) => setCampo(f.key, "colores", e.target.value.toUpperCase().replace(/\./g, ""))}
@@ -444,7 +444,7 @@ export function PlanillaForm({
                       className="h-11"
                     />
                   </Campo>
-                  <Campo etiqueta="Colocación PVC" className="col-span-2 sm:col-span-2">
+                  <Campo etiqueta="Colocación PVC" className="col-span-2 lg:col-span-2">
                     <Input
                       value={f.colocacion_pvc}
                       onChange={(e) => setCampo(f.key, "colocacion_pvc", e.target.value)}
@@ -453,7 +453,7 @@ export function PlanillaForm({
                       className="h-11"
                     />
                   </Campo>
-                  <Campo etiqueta="Corte y perfilado" className="col-span-2 sm:col-span-2">
+                  <Campo etiqueta="Corte y perfilado" className="col-span-2 lg:col-span-2">
                     <Input
                       value={f.perfilado}
                       onChange={(e) => setCampo(f.key, "perfilado", e.target.value)}
@@ -464,11 +464,11 @@ export function PlanillaForm({
                   </Campo>
                 </>
               ) : (
-                <Campo etiqueta="Cantidad de piezas" className="col-span-2 sm:col-span-2">
+                <Campo etiqueta="Cantidad de piezas" className="col-span-2 lg:col-span-2">
                   <NumeroInput valor={f.cantidad_piezas} onChange={(v) => setCampo(f.key, "cantidad_piezas", v)} />
                 </Campo>
               )}
-              <Campo etiqueta="Observaciones" className="col-span-2 sm:col-span-6">
+              <Campo etiqueta="Observaciones" className="col-span-2 lg:col-span-6">
                 <Input
                   value={f.observaciones}
                   onChange={(e) => setCampo(f.key, "observaciones", e.target.value)}
@@ -555,10 +555,18 @@ function HoraInput({ valor, onChange }: { valor: string; onChange: (v: string) =
         autoComplete="off"
         aria-invalid={invalida}
         aria-label="Hora (24 h)"
-        className="h-11 min-w-0"
+        className="h-11 min-w-0 text-center text-lg font-medium tabular-nums"
       />
-      <Button type="button" variant="outline" className="h-11 px-2 text-xs" onClick={() => onChange(ahora())} aria-label="Poner la hora actual">
-        Ahora
+      <Button
+        type="button"
+        variant="outline"
+        className="h-11 shrink-0 px-3 text-sm lg:px-0 lg:w-11"
+        onClick={() => onChange(ahora())}
+        aria-label="Poner la hora actual"
+        title="Poner la hora actual"
+      >
+        <ClockIcon className="hidden lg:block" />
+        <span className="lg:hidden">Ahora</span>
       </Button>
     </div>
   );

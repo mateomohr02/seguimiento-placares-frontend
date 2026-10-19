@@ -44,13 +44,13 @@ export async function BarraNavegacion() {
   if (!sesion) return null;
 
   return (
-    // Celular: dos filas (logo y usuario arriba, enlaces abajo); desde md, una sola fila.
-    <header className="sticky top-0 z-40 grid h-(--barra-h) grid-cols-[auto_1fr] grid-rows-[3rem_2.75rem] items-center gap-x-3 border-b bg-background/95 px-3 backdrop-blur supports-backdrop-filter:bg-background/80 md:grid-cols-[auto_1fr_auto] md:grid-rows-1">
+    // Celular y tablet vertical: dos filas (logo y usuario arriba, enlaces abajo); desde lg, una sola fila.
+    <header className="sticky top-0 z-40 grid h-(--barra-h) grid-cols-[auto_1fr] grid-rows-[3rem_2.75rem] items-center gap-x-3 border-b bg-background/95 px-3 backdrop-blur supports-backdrop-filter:bg-background/80 lg:grid-cols-[auto_1fr_auto] lg:grid-rows-1">
       <Link href="/" aria-label="Ir al inicio" className="row-start-1 shrink-0">
         <LogoNeostone className="w-24 xl:w-32" />
       </Link>
-      <NavLinks grupos={gruposDe(sesion)} className="col-span-2 row-start-2 md:col-span-1 md:col-start-2 md:row-start-1" />
-      <div className="col-start-2 row-start-1 justify-self-end md:col-start-3">
+      <NavLinks grupos={gruposDe(sesion)} className="col-span-2 row-start-2 lg:col-span-1 lg:col-start-2 lg:row-start-1" />
+      <div className="col-start-2 row-start-1 justify-self-end lg:col-start-3">
         <UsuarioMenu />
       </div>
     </header>
