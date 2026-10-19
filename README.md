@@ -414,7 +414,7 @@ Parte diario digital de las tres subestaciones, en el orden del proceso: **Lijad
 - **Borrador automático**: todo lo que se escribe se guarda solo en el servidor unos instantes después ("Borrador guardado …"); si se cierra la sesión, se apaga la tablet o se recarga la página, **lo cargado sigue ahí**. Mientras tanto la planilla figura como **Borrador**.
 - **Guardar planilla** la cierra (queda **Guardada**). Cada ítem necesita pedido, hora de inicio y cantidad; si falta algo, avisa cuál. Una planilla guardada **se puede corregir**: se editan los datos y se toca **Guardar cambios**; la app conserva la **versión anterior** (quién, cuándo) y se ve en el historial del detalle.
 - **Fotos (solo PVC)**: en cada ítem, **Sacar foto** abre la cámara (o **Elegir de la galería**); se pueden subir varias, se ven como miniaturas, se amplían al tocarlas y se borran con la ×. La foto de la pieza se saca antes de termolaminar. (En un ítem recién agregado, la app lo guarda antes de subir la foto.)
-- Los **operarios** del encabezado y **qué planillas ve cada usuario** los define técnica en **Configurar**.
+- **Operarios**: en el encabezado se tocan los que trabajaron en esa planilla (los botones salen de la lista que técnica define en **Configurar**, donde también asigna qué planillas ve cada usuario). Quedan guardados con su nombre: cambiar la lista después no altera la planilla.
 
 ### Planificación semanal (`Planificación`)
 
@@ -425,7 +425,7 @@ La oficina técnica sube, por semana, la **planificación de pedidos** y los **r
 - **Registros**: tabla cruda de todo lo cargado, con filtros (fechas —por defecto los últimos 30 días—, estación, estado y pedido), cantidad de **fotos** por registro y enlaces al **detalle** de la planilla (ítems, fotos ampliables, historial de correcciones). Tocar un N° de pedido abre su trazabilidad.
 - **Indicadores**: por estación (piezas, pedidos, días con carga, tiempo trabajado, piezas por hora), piezas por día y la situación de los pedidos del período (los que pasaron por las tres estaciones, los que faltan y los que tienen **cantidad de piezas distinta** entre estaciones). Incluyen también los borradores.
 - **Trazabilidad de un pedido** (`/planillas/trazabilidad?pedido=`): por qué estaciones pasó, cuándo y cuántas piezas en cada una.
-- **Configurar** (`planillas.configurar`, técnica): lista de operarios del área (se copian a las planillas nuevas) y tabla de **acceso a las planillas** (casillas por usuario y planilla; se guardan al tocarlas).
+- **Configurar** (`planillas.configurar`, técnica): lista de operarios del área (en cada planilla se eligen a mano) y tabla de **acceso a las planillas** (casillas por usuario y planilla; se guardan al tocarlas).
 
 ---
 

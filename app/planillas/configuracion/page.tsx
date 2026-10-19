@@ -22,7 +22,7 @@ export default async function ConfiguracionPlanillasPage() {
         <div>
           <h2 className="text-lg font-semibold">Operarios</h2>
           <p className="text-sm text-muted-foreground">
-            Estos nombres salen en el encabezado de las planillas de Lijado, Encolado y PVC. Las planillas que ya se crearon conservan los nombres que tenían.
+            Esta es la lista de operarios del área: en cada planilla, el usuario elige a mano cuáles trabajaron. Cambiar un nombre acá no modifica las planillas ya creadas (guardan el nombre que tenían).
           </p>
         </div>
         <OperariosForm inicial={operarios} />

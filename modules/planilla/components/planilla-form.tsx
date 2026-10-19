@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2Icon, ClockIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { CheckCircle2Icon, CheckIcon, ClockIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,8 +74,9 @@ const desdeServidor = (p: Planilla): FilaForm[] =>
 
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
 
-const hacerBody = (estado: EstadoPlanilla, filas: FilaForm[]) => ({
+const hacerBody = (estado: EstadoPlanilla, operarios: string[], filas: FilaForm[]) => ({
   estado,
+  operarios,
   filas: filas.map((f) => ({
     id: f.id,
     hora_inicio: f.hora_inicio,
@@ -119,7 +120,8 @@ export function PlanillaForm({
   const router = useRouter();
   const [filas, setFilas] = useState<FilaForm[]>(() => (inicial && inicial.filas.length > 0 ? desdeServidor(inicial) : [vacia()]));
   const [estado, setEstado] = useState<EstadoPlanilla>(inicial?.estado ?? "BORRADOR");
-  const [operarios, setOperarios] = useState<string[]>(inicial?.operarios ?? operariosConfigurados);
+  // Los operarios se eligen a mano para cada planilla (de la lista que configura técnica).
+  const [operarios, setOperarios] = useState<string[]>(inicial?.operarios ?? []);
   const [actualizadaEn, setActualizadaEn] = useState<string | null>(inicial?.actualizado_en ?? null);
   const [modificadaPor, setModificadaPor] = useState<string | null>(inicial?.modificado_por ?? null);
   const [versiones, setVersiones] = useState(inicial?.versiones.length ?? 0);
@@ -130,6 +132,7 @@ export function PlanillaForm({
   const [sugerencias, setSugerencias] = useState<Sugerencia[]>([]);
 
   const filasRef = useRef(filas);
+  const operariosRef = useRef(operarios);
   const estadoRef = useRef(estado);
   const cambiosRef = useRef(0);
   const cola = useRef<Promise<unknown>>(Promise.resolve());
@@ -138,6 +141,7 @@ export function PlanillaForm({
 
   useEffect(() => {
     filasRef.current = filas;
+    operariosRef.current = operarios;
     estadoRef.current = estado;
   });
 
@@ -153,7 +157,7 @@ export function PlanillaForm({
           const res = await fetch(`/planillas-api/dia/${slugEstacion(estacion)}/${fecha}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(hacerBody(destino, enviadas)),
+            body: JSON.stringify(hacerBody(destino, operariosRef.current, enviadas)),
           });
           const body = (await res.json().catch(() => null)) as { data?: Planilla; message?: string } | null;
           if (!res.ok || !body?.data) {
@@ -166,7 +170,7 @@ export function PlanillaForm({
           const idPorKey = new Map(enviadas.map((f, i) => [f.key, p.filas[i]?.id]));
           setFilas((prev) => prev.map((f) => (f.id ? f : { ...f, id: idPorKey.get(f.key) })));
           setEstado(p.estado);
-          setOperarios(p.operarios);
+          if (cambiosRef.current === vistos) setOperarios(p.operarios);
           setActualizadaEn(p.actualizado_en);
           setModificadaPor(p.modificado_por);
           setVersiones(p.versiones.length);
@@ -193,7 +197,7 @@ export function PlanillaForm({
     if (!sucio || estado !== "BORRADOR") return;
     const t = setTimeout(() => void guardar("BORRADOR"), AUTOSAVE_MS);
     return () => clearTimeout(t);
-  }, [sucio, estado, filas, guardar]);
+  }, [sucio, estado, filas, operarios, guardar]);
 
   // Avisa antes de cerrar la pestaña con cambios sin guardar.
   useEffect(() => {
@@ -208,6 +212,12 @@ export function PlanillaForm({
     setSucio(true);
     setFilas(fn);
   }, []);
+
+  function alternarOperario(nombre: string) {
+    cambiosRef.current++;
+    setSucio(true);
+    setOperarios((prev) => (prev.includes(nombre) ? prev.filter((n) => n !== nombre) : [...prev, nombre]));
+  }
 
   function setCampo(key: string, campo: CampoTexto, valor: string) {
     editar((prev) => prev.map((f) => (f.key === key ? { ...f, [campo]: valor } : f)));
@@ -279,6 +289,8 @@ export function PlanillaForm({
     return s + (Number.isFinite(n) ? n : 0);
   }, 0);
   const guardada = estado === "GUARDADA";
+  // La lista del área más los ya elegidos (por si técnica los sacó de la lista después).
+  const operariosDisponibles = [...operariosConfigurados, ...operarios.filter((n) => !operariosConfigurados.includes(n))];
 
   return (
     <div className="flex flex-col gap-5">
@@ -295,14 +307,33 @@ export function PlanillaForm({
             className="h-11 w-44"
           />
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-          <span className="font-medium">Operarios</span>
-          {operarios.length > 0 ? (
-            <span>{operarios.join(", ")}</span>
-          ) : (
+        <fieldset className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+          <legend className="font-medium">Operarios</legend>
+          {operariosDisponibles.length === 0 ? (
             <span className="text-muted-foreground">Técnica todavía no configuró los operarios del área.</span>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {operariosDisponibles.map((n) => {
+                const marcado = operarios.includes(n);
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={marcado}
+                    onClick={() => alternarOperario(n)}
+                    className={`inline-flex h-10 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition active:scale-[0.98] ${
+                      marcado ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
+                    }`}
+                  >
+                    {marcado && <CheckIcon className="size-4" />} {n}
+                  </button>
+                );
+              })}
+            </div>
           )}
-        </div>
+          <span className="text-xs text-muted-foreground">Tocá los operarios que trabajaron en esta planilla.</span>
+        </fieldset>
         <div className="flex flex-col items-end gap-1 text-sm">
           <Badge variant={guardada ? "default" : "secondary"}>{guardada ? "Guardada" : "Borrador"}</Badge>
           <span className="text-xs text-muted-foreground" aria-live="polite">
