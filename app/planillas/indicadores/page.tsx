@@ -13,7 +13,7 @@ const COLOR: Record<Estacion, string> = { LIJADO: "var(--chart-2)", ENCOLADO: "v
 
 export default async function IndicadoresPage({ searchParams }: { searchParams: Promise<{ desde?: string; hasta?: string }> }) {
   const sesion = await requireSesion();
-  if (!puede(sesion, PERMISOS.PLANILLAS_VER)) notFound();
+  if (!puede(sesion, PERMISOS.PLANILLAS_INDICADORES)) notFound();
 
   const f = await searchParams;
   const { desde, hasta } = rangoPorDefecto(hoyLocal(), f.desde, f.hasta);

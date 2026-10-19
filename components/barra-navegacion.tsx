@@ -28,8 +28,9 @@ function gruposDe(sesion: Sesion): NavGrupo[] {
   }
   if (puede(sesion, PERMISOS.PLANILLAS_VER)) {
     // La trazabilidad de un pedido se abre desde Registros e Indicadores (para que la barra entre en una tablet).
-    termolaminado.push({ href: "/planillas/registros", label: "Registros" }, { href: "/planillas/indicadores", label: "Indicadores" });
+    termolaminado.push({ href: "/planillas/registros", label: "Registros" });
   }
+  if (puede(sesion, PERMISOS.PLANILLAS_INDICADORES)) termolaminado.push({ href: "/planillas/indicadores", label: "Indicadores" });
   if (puede(sesion, PERMISOS.PLANILLAS_CONFIGURAR)) termolaminado.push({ href: "/planillas/operarios", label: "Operarios" });
   if (termolaminado.length > 0) grupos.push({ titulo: "Termolaminado", links: termolaminado });
 

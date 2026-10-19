@@ -261,7 +261,7 @@ Al abrir la app aparece la pantalla de **PIN** (teclado numérico en pantalla; *
 | `fabrica` (estaciones) | Ver órdenes, pedidos, módulos, despieces y documentación; **Escanear** y **Finalizado / Pendiente** por pieza; **anotar** sobre los documentos (puede deshacer lo que anota en esa sesión, pero **no** borrar anotaciones ya guardadas); **completar las planillas de Termolaminado** y ver sus registros e indicadores. No ve "Agregar orden", Archivar ni Eliminar, ni subir/eliminar documentos |
 | `gerencia` | Solo lectura: no ve "Escanear" (entrar a `/escaneo` lo devuelve al listado), ni botones de piezas, ni "Anotar", ni subir/eliminar. Ve los registros, indicadores y la planificación de Termolaminado |
 
-La barra de navegación suma, según los permisos: **Lijado · Encolado · PVC** (completar planillas), **Planificación**, **Registros**, **Indicadores** y, para técnica, **Operarios**.
+La barra de navegación suma, según los permisos: **Lijado · Encolado · PVC** (completar planillas), **Planificación**, **Registros**, **Indicadores** (solo técnica, gerencia y admin; `fabrica` no los ve) y, para técnica, **Operarios**.
 
 ### Aviso de red
 
