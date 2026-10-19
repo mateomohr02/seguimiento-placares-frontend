@@ -79,8 +79,9 @@ const hacerBody = (estado: EstadoPlanilla, operarios: string[], filas: FilaForm[
   operarios,
   filas: filas.map((f) => ({
     id: f.id,
-    hora_inicio: f.hora_inicio,
-    hora_fin: f.hora_fin,
+    // Una hora a medio escribir no se manda (queda vacía) hasta que esté completa.
+    hora_inicio: HORA_VALIDA.test(f.hora_inicio) ? f.hora_inicio : "",
+    hora_fin: HORA_VALIDA.test(f.hora_fin) ? f.hora_fin : "",
     pedido_codigo: f.pedido_codigo,
     cantidad_piezas: num(f.cantidad_piezas),
     observaciones: f.observaciones,
@@ -91,6 +92,14 @@ const hacerBody = (estado: EstadoPlanilla, operarios: string[], filas: FilaForm[
     mesa_grande: num(f.mesa_grande),
   })),
 });
+
+const HORA_VALIDA = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Escribiendo solo números: "0610" → "06:10" (siempre 24 horas, sin AM/PM).
+const formatearHora = (v: string) => {
+  const d = v.replace(/\D/g, "").slice(0, 4);
+  return d.length > 2 ? `${d.slice(0, 2)}:${d.slice(2)}` : d;
+};
 
 const ahora = () => {
   const d = new Date();
@@ -532,9 +541,22 @@ function NumeroInput({ valor, onChange }: { valor: string; onChange: (v: string)
 }
 
 function HoraInput({ valor, onChange }: { valor: string; onChange: (v: string) => void }) {
+  const [tocado, setTocado] = useState(false);
+  const invalida = tocado && valor !== "" && !HORA_VALIDA.test(valor);
   return (
     <div className="flex gap-1">
-      <Input type="time" value={valor} onChange={(e) => onChange(e.target.value)} className="h-11 min-w-0" />
+      <Input
+        value={valor}
+        onChange={(e) => onChange(formatearHora(e.target.value))}
+        onBlur={() => setTocado(true)}
+        inputMode="numeric"
+        placeholder="HH:MM"
+        maxLength={5}
+        autoComplete="off"
+        aria-invalid={invalida}
+        aria-label="Hora (24 h)"
+        className="h-11 min-w-0"
+      />
       <Button type="button" variant="outline" className="h-11 px-2 text-xs" onClick={() => onChange(ahora())} aria-label="Poner la hora actual">
         Ahora
       </Button>
