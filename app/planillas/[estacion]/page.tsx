@@ -28,10 +28,10 @@ export default async function PlanillaPage({
   ]);
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6">
+    <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 lg:gap-3 lg:py-4">
       <div>
         <h1 className="text-xl font-semibold">Planilla de {ETIQUETA_ESTACION[estacion]}</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground lg:hidden">
           Parte diario de Termolaminado. Se completa durante el día; lo que cargues queda guardado como borrador hasta que la guardes.
         </p>
       </div>

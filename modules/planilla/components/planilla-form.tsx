@@ -302,9 +302,10 @@ export function PlanillaForm({
   const operariosDisponibles = [...operariosConfigurados, ...operarios.filter((n) => !operariosConfigurados.includes(n))];
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-[auto_1fr] items-end gap-x-4 gap-y-4 rounded-lg border p-4">
-        <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-5 lg:gap-3">
+      {/* Vertical: fecha y estado arriba, operarios abajo. Apaisado (lg): todo en una sola fila baja. */}
+      <div className="grid grid-cols-[auto_1fr] items-end gap-x-4 gap-y-4 rounded-lg border p-4 lg:grid-cols-[auto_1fr_auto] lg:items-center lg:gap-y-0 lg:px-3 lg:py-2">
+        <div className="flex flex-col gap-1 lg:flex-row lg:items-center lg:gap-2">
           <label htmlFor="planilla-fecha" className="text-sm font-medium">
             Fecha
           </label>
@@ -313,11 +314,17 @@ export function PlanillaForm({
             type="date"
             value={fecha}
             onChange={(e) => void cambiarFecha(e.target.value)}
-            className="h-11 w-44"
+            className="h-11 w-44 lg:h-10"
           />
         </div>
-        <fieldset className="col-span-2 row-start-2 flex min-w-0 flex-col gap-1 text-sm">
-          <legend className="font-medium">Operarios</legend>
+        <div
+          role="group"
+          aria-labelledby="planilla-operarios"
+          className="col-span-2 row-start-2 flex min-w-0 flex-col gap-1 text-sm lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:flex-row lg:flex-wrap lg:items-center lg:gap-2"
+        >
+          <span id="planilla-operarios" className="font-medium">
+            Operarios
+          </span>
           {operariosDisponibles.length === 0 ? (
             <span className="text-muted-foreground">Técnica todavía no configuró los operarios del área.</span>
           ) : (
@@ -331,7 +338,7 @@ export function PlanillaForm({
                     role="checkbox"
                     aria-checked={marcado}
                     onClick={() => alternarOperario(n)}
-                    className={`inline-flex h-11 items-center gap-1.5 rounded-full border px-5 text-base font-medium transition active:scale-[0.98] ${
+                    className={`inline-flex h-11 items-center gap-1.5 rounded-full border px-5 text-base font-medium transition lg:h-9 lg:px-4 lg:text-sm active:scale-[0.98] ${
                       marcado ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
                     }`}
                   >
@@ -341,9 +348,9 @@ export function PlanillaForm({
               })}
             </div>
           )}
-          <span className="text-xs text-muted-foreground">Tocá los operarios que trabajaron en esta planilla.</span>
-        </fieldset>
-        <div className="col-start-2 row-start-1 flex flex-col items-end gap-1 text-right text-sm">
+          <span className="text-xs text-muted-foreground lg:hidden">Tocá los operarios que trabajaron en esta planilla.</span>
+        </div>
+        <div className="col-start-2 row-start-1 flex flex-col items-end gap-1 text-right text-sm lg:col-start-3 lg:gap-0.5">
           <Badge variant={guardada ? "default" : "secondary"}>{guardada ? "Guardada" : "Borrador"}</Badge>
           <span className="text-xs text-muted-foreground" aria-live="polite">
             {guardando ? (
