@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSesion } from "@/lib/auth/sesion";
-import { PERMISOS, puede, puedeCompletarPlanilla, type Sesion } from "@/lib/auth/permisos";
+import { PERMISOS, estacionesVisibles, puede, puedeCompletarPlanilla, type Sesion } from "@/lib/auth/permisos";
 import { LogoNeostone } from "@/components/logo-neostone";
 import { UsuarioMenu } from "@/components/usuario-menu";
 import { NavLinks, type NavGrupo } from "@/components/nav-links";
@@ -23,7 +23,7 @@ function gruposDe(sesion: Sesion): NavGrupo[] {
   if (puede(sesion, PERMISOS.DOCUMENTACION_VER) && puede(sesion, PERMISOS.PLANILLAS_VER)) {
     termolaminado.push({ href: "/planificacion", label: "Planificación" });
   }
-  if (puede(sesion, PERMISOS.PLANILLAS_VER)) {
+  if (puede(sesion, PERMISOS.PLANILLAS_VER) && estacionesVisibles(sesion).length > 0) {
     // La trazabilidad de un pedido se abre desde Registros e Indicadores (para que la barra entre en una tablet).
     termolaminado.push({ href: "/planillas/registros", label: "Registros" });
   }

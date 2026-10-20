@@ -123,7 +123,9 @@ export interface RegistroTraza {
   planilla_id: string;
 }
 
-export interface Trazabilidad extends ResumenPedido {
+export interface Trazabilidad extends Omit<ResumenPedido, "estaciones"> {
+  /** Solo las estaciones que el usuario puede ver. */
+  estaciones: Partial<ResumenPedido["estaciones"]>;
   pedido_id: string | null;
   referencia: string | null;
   registros: RegistroTraza[];

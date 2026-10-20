@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowRightIcon, ImageIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api/api-client";
 import { requireSesion } from "@/lib/auth/sesion";
-import { PERMISOS, puede } from "@/lib/auth/permisos";
+import { PERMISOS, estacionesVisibles, puede } from "@/lib/auth/permisos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,8 @@ import type { Trazabilidad } from "@/modules/planilla/types/planilla.types";
 // Recorrido de un pedido por Lijado → Encolado → PVC según las planillas.
 export default async function TrazabilidadPage({ searchParams }: { searchParams: Promise<{ pedido?: string }> }) {
   const sesion = await requireSesion();
-  if (!puede(sesion, PERMISOS.PLANILLAS_VER)) notFound();
+  const visibles = ESTACIONES.filter((e) => estacionesVisibles(sesion).includes(e));
+  if (!puede(sesion, PERMISOS.PLANILLAS_VER) || visibles.length === 0) notFound();
 
   const pedido = ((await searchParams).pedido ?? "").trim();
   const traza = pedido ? await apiFetch<Trazabilidad>(`/planillas/trazabilidad?pedido=${encodeURIComponent(pedido)}`) : null;
@@ -51,8 +52,8 @@ export default async function TrazabilidadPage({ searchParams }: { searchParams:
           </div>
 
           <ol className="grid gap-3 sm:grid-cols-3">
-            {ESTACIONES.map((e, i) => {
-              const r = traza.estaciones[e];
+            {visibles.map((e, i) => {
+              const r = traza.estaciones[e]!;
               const paso = r.registros > 0;
               return (
                 <li key={e} className={`flex flex-col gap-1 rounded-lg border p-4 ${paso ? "" : "border-dashed text-muted-foreground"}`}>
@@ -60,7 +61,7 @@ export default async function TrazabilidadPage({ searchParams }: { searchParams:
                     <span className="font-semibold">
                       {i + 1}. {ETIQUETA_ESTACION[e]}
                     </span>
-                    {i < ESTACIONES.length - 1 && <ArrowRightIcon className="size-4 text-muted-foreground" aria-hidden />}
+                    {i < visibles.length - 1 && <ArrowRightIcon className="size-4 text-muted-foreground" aria-hidden />}
                   </div>
                   {paso ? (
                     <>

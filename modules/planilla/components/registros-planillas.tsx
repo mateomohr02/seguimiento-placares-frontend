@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { ImageIcon } from "lucide-react";
 import { ColumnFilter } from "@/components/column-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ESTACIONES, ETIQUETA_ESTACION, fechaCorta, slugEstacion } from "../lib/estaciones";
+import { ETIQUETA_ESTACION, fechaCorta, slugEstacion } from "../lib/estaciones";
 import type { Estacion, RegistroPlanilla } from "../types/planilla.types";
 
 // Registros de producción de Termolaminado: una tabla por planilla (Lijado, Encolado y PVC), cada una con sus columnas y
@@ -102,10 +102,21 @@ type Seleccion = Record<string, Set<string> | null | undefined>;
 
 const ordenar = (a: string, b: string) => a.localeCompare(b, "es", { numeric: true });
 
-function TablaEstacion({ estacion, registros, puedeAbrir }: { estacion: Estacion; registros: RegistroPlanilla[]; puedeAbrir: boolean }) {
+function TablaEstacion({
+  estacion,
+  registros,
+  puedeAbrir,
+  seleccion,
+  setSeleccion,
+}: {
+  estacion: Estacion;
+  registros: RegistroPlanilla[];
+  puedeAbrir: boolean;
+  seleccion: Seleccion;
+  setSeleccion: (fn: (s: Seleccion) => Seleccion) => void;
+}) {
   const columnas = COLUMNAS[estacion];
   const filtrables = columnas.filter((c) => c.filtrable);
-  const [seleccion, setSeleccion] = useState<Seleccion>({});
 
   const pasa = (r: RegistroPlanilla, omitir?: string) =>
     filtrables.every((c) => {
@@ -134,7 +145,7 @@ function TablaEstacion({ estacion, registros, puedeAbrir }: { estacion: Estacion
   const filtrado = filas.length !== registros.length;
 
   return (
-    <section id={slugEstacion(estacion)} className="flex scroll-mt-20 flex-col gap-2">
+    <section id={slugEstacion(estacion)} className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">
           {ETIQUETA_ESTACION[estacion]}{" "}
@@ -145,7 +156,7 @@ function TablaEstacion({ estacion, registros, puedeAbrir }: { estacion: Estacion
           </span>
         </h2>
         {activos > 0 && (
-          <Button size="sm" variant="ghost" onClick={() => setSeleccion({})}>
+          <Button size="sm" variant="ghost" onClick={() => setSeleccion(() => ({}))}>
             Limpiar {activos === 1 ? "filtro" : `${activos} filtros`}
           </Button>
         )}
@@ -210,23 +221,72 @@ function TablaEstacion({ estacion, registros, puedeAbrir }: { estacion: Estacion
   );
 }
 
-export function RegistrosPlanillas({ registros, abribles }: { registros: RegistroPlanilla[]; abribles: Estacion[] }) {
+const MS_SALIDA = 200;
+
+export function RegistrosPlanillas({ registros, abribles, estaciones }: { registros: RegistroPlanilla[]; abribles: Estacion[]; estaciones: Estacion[] }) {
   const porEstacion = useMemo(
-    () => Object.fromEntries(ESTACIONES.map((e) => [e, registros.filter((r) => r.estacion === e)])) as Record<Estacion, RegistroPlanilla[]>,
-    [registros],
+    () => Object.fromEntries(estaciones.map((e) => [e, registros.filter((r) => r.estacion === e)])) as Record<Estacion, RegistroPlanilla[]>,
+    [registros, estaciones],
   );
+  // Se muestra una sola tabla por vez. Al cambiar, la anterior sale deslizándose y la nueva entra desde el lado
+  // correspondiente (según el orden del proceso). Los filtros de cada tabla se conservan al ir y volver.
+  const [activa, setActiva] = useState<Estacion>(estaciones[0]);
+  const [saliente, setSaliente] = useState<Estacion | null>(null);
+  const [dir, setDir] = useState<1 | -1>(1);
+  const [selecciones, setSelecciones] = useState<Partial<Record<Estacion, Seleccion>>>({});
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
+
+  function elegir(e: Estacion) {
+    if (e === activa) return;
+    setDir(estaciones.indexOf(e) > estaciones.indexOf(activa) ? 1 : -1);
+    setSaliente(activa);
+    setActiva(e);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSaliente(null), MS_SALIDA);
+  }
+
+  const tabla = (e: Estacion) => (
+    <TablaEstacion
+      estacion={e}
+      registros={porEstacion[e]}
+      puedeAbrir={abribles.includes(e)}
+      seleccion={selecciones[e] ?? {}}
+      setSeleccion={(fn) => setSelecciones((p) => ({ ...p, [e]: fn(p[e] ?? {}) }))}
+    />
+  );
+
   return (
-    <div className="flex flex-col gap-8">
-      <nav aria-label="Planillas" className="flex flex-wrap gap-2">
-        {ESTACIONES.map((e) => (
-          <a key={e} href={`#${slugEstacion(e)}`} className="inline-flex h-9 items-center rounded-full border px-4 text-sm font-medium hover:bg-muted">
-            {ETIQUETA_ESTACION[e]} ({porEstacion[e].length})
-          </a>
-        ))}
-      </nav>
-      {ESTACIONES.map((e) => (
-        <TablaEstacion key={e} estacion={e} registros={porEstacion[e]} puedeAbrir={abribles.includes(e)} />
-      ))}
+    <div className="flex flex-col gap-4">
+      {estaciones.length > 1 && (
+        <div role="tablist" aria-label="Planillas" className="flex flex-wrap gap-2">
+          {estaciones.map((e) => (
+            <button
+              key={e}
+              type="button"
+              role="tab"
+              aria-selected={e === activa}
+              onClick={() => elegir(e)}
+              className={`inline-flex h-11 items-center rounded-full border px-5 text-base font-medium transition active:scale-[0.98] lg:h-9 lg:px-4 lg:text-sm ${
+                e === activa ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
+              }`}
+            >
+              {ETIQUETA_ESTACION[e]} ({porEstacion[e].length})
+            </button>
+          ))}
+        </div>
+      )}
+      {/* Las dos tablas comparten la misma celda mientras dura la transición; overflow-x-clip evita la barra horizontal de la página. */}
+      <div className="grid overflow-x-clip" style={{ "--dir": dir } as CSSProperties}>
+        {saliente && (
+          <div key={`sale-${saliente}`} className="tabla-sale col-start-1 row-start-1 min-w-0" aria-hidden>
+            {tabla(saliente)}
+          </div>
+        )}
+        <div key={`entra-${activa}`} className={`col-start-1 row-start-1 min-w-0 ${saliente ? "tabla-entra" : ""}`} role="tabpanel">
+          {tabla(activa)}
+        </div>
+      </div>
     </div>
   );
 }

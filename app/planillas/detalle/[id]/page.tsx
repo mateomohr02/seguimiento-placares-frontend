@@ -73,7 +73,7 @@ export default async function DetallePlanillaPage({ params }: { params: Promise<
   try {
     planilla = await apiFetch<Planilla>(`/planillas/${id}`);
   } catch (e) {
-    if (e instanceof ApiError && (e.status === 404 || e.status === 400)) notFound();
+    if (e instanceof ApiError && (e.status === 404 || e.status === 400 || e.status === 403)) notFound();
     throw e;
   }
   const versiones = await Promise.all(planilla.versiones.map((x) => apiFetch<DatosVersion>(`/planillas/versiones/${x.id}`)));

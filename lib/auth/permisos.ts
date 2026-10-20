@@ -30,3 +30,12 @@ export const puede = (sesion: Sesion, permiso: Permiso) => sesion.permisos.inclu
 /** ¿Puede completar la planilla de esa estación? Exige el permiso y tenerla asignada. */
 export const puedeCompletarPlanilla = (sesion: Sesion, estacion: string) =>
   puede(sesion, PERMISOS.PLANILLAS_COMPLETAR) && sesion.planillas.includes(estacion);
+
+const ESTACIONES_PLANILLA = ["LIJADO", "ENCOLADO", "PVC"];
+
+/**
+ * Estaciones cuyos registros puede ver el usuario: los de fábrica, solo las planillas que tienen asignadas
+ * (si técnica no le asignó ninguna, no ve ninguna); el resto de los roles, todas. El backend lo valida igual.
+ */
+export const estacionesVisibles = (sesion: Sesion) =>
+  sesion.rol === "fabrica" ? ESTACIONES_PLANILLA.filter((e) => sesion.planillas.includes(e)) : ESTACIONES_PLANILLA;

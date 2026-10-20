@@ -181,3 +181,43 @@ html {
     top: 90%;
   }
 }
+
+/* Cambio de tabla en Registros: la que sale se desliza y se desvanece hacia un lado y la que entra viene del otro
+   (--dir vale 1 o -1 según el sentido). */
+@keyframes tabla-entra {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--dir, 1) * 2.5rem));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes tabla-sale {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(calc(var(--dir, 1) * -2.5rem));
+  }
+}
+
+.tabla-entra {
+  animation: tabla-entra 260ms ease-out both;
+}
+
+.tabla-sale {
+  animation: tabla-sale 200ms ease-in both;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabla-entra,
+  .tabla-sale {
+    animation-duration: 1ms;
+  }
+}
