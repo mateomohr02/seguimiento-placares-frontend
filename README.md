@@ -12,6 +12,7 @@ La interfaz web que usan **logística** (ver el progreso de las órdenes) y el *
 2. [Estructura de carpetas](#estructura-de-carpetas)
 3. [Variables de entorno](#variables-de-entorno)
 4. [Cómo levantarlo](#cómo-levantarlo)
+   - [Flujo de ramas (git)](#flujo-de-ramas-git)
 5. [Cámara y HTTPS — por qué hace falta Caddy](#cámara-y-https--por-qué-hace-falta-caddy)
 6. [Manual de usuario, vista por vista](#manual-de-usuario-vista-por-vista)
 7. [Documentación digital y anotaciones](#documentación-digital-y-anotaciones)
@@ -132,6 +133,18 @@ npm run dev       # levanta el servidor de desarrollo
 Vas a ver `Ready` y la URL `http://localhost:3000`. Con eso ya podés abrir la app **desde esta misma PC**.
 
 Si necesitás usar la cámara (Vista 5) desde una **tablet**, hace falta un paso extra — seguí leyendo.
+
+---
+
+## Flujo de ramas (git)
+
+Detalle en `diseño.md` §15 (vale para este repo y el otro).
+
+- **`main`** es producción. Solo recibe merges de `dev` (`--no-ff`) cuando el usuario lo pide y lo autoriza; el push de `main` también es solo con autorización.
+- **`dev`** es la rama de integración: se levanta contra la base de prueba `Neostone_test` y no se desarrolla directo sobre ella.
+- **Ramas de trabajo** (una por cambio y por repo; los commits van en español): `fix/<tema>`, `feature/<tema>` y `docs/<tema>` salen de `dev`, se prueban contra `Neostone_test` y vuelven a `dev` con merge `--no-ff`. No se borran ramas sin pedido.
+- **Base de datos**: toda migración nueva (aditiva, con `down.sql`) se prueba primero en `Neostone_test`; en `Neostone` (producción) solo se aplica cuando el usuario lo pide expresamente, con respaldo previo (`pg_dump`) y verificación de solo lectura después. Nunca se siembran datos de prueba en producción.
+- `feature/seguimiento-termolaminado` (versión 1, ya en `main`) se conserva como historial.
 
 ---
 
@@ -414,7 +427,7 @@ Parte diario digital de las tres subestaciones, en el orden del proceso: **Lijad
 - **Borrador automático**: todo lo que se escribe se guarda solo en el servidor unos instantes después ("Borrador guardado …"); si se cierra la sesión, se apaga la tablet o se recarga la página, **lo cargado sigue ahí**. Mientras tanto la planilla figura como **Borrador**.
 - **Guardar planilla** (botón flotante en la esquina inferior derecha del formulario, siempre a mano) la cierra (queda **Guardada**). Cada ítem necesita pedido, hora de inicio y cantidad; si falta algo, avisa cuál. Una planilla guardada **se puede corregir**: se editan los datos y se toca **Guardar cambios**; la app conserva la **versión anterior** (quién, cuándo) y se ve en el historial del detalle (con las fotos de cada ítem, incluso de los que se quitaron en la corrección).
 - **Fotos (solo PVC)**: en cada ítem, **Sacar foto** abre la cámara (o **Elegir de la galería**); se pueden subir varias, se ven como miniaturas, se amplían al tocarlas y se borran con la ×. La foto de la pieza se saca antes de termolaminar. En un ítem recién agregado **no hace falta guardar antes**: la foto queda como **Pendiente** en miniatura (solo en el equipo) y se sube sola cuando el ítem se guarda (borrador automático, o **Guardar cambios** si la planilla ya estaba guardada). Si falla la subida, sigue en el equipo y se reintenta al guardar.
-- **Operarios**: en el encabezado se tocan los que trabajaron en esa planilla (los botones son los operarios que técnica le configuró a ese usuario). Quedan guardados con su nombre: cambiar la lista después no altera la planilla.
+- **Operarios**: en el encabezado se tocan los que trabajaron en esa planilla (los botones son los operarios que técnica le configuró a ese usuario). Quedan guardados con su nombre: cambiar la lista después no altera la planilla. **Al abrir una planilla nueva vienen marcados** los operarios que dejaste elegidos la última vez en esa misma estación (la primera vez, todos): por ejemplo, si en PVC dejás solo a Fabián, la próxima planilla de PVC ya aparece solo con él, y Lijado y Encolado siguen con ambos. Corregir una planilla ya guardada no cambia esa preselección.
 
 ### Planificación semanal (`Planificación`)
 

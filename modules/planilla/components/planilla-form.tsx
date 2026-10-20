@@ -122,19 +122,22 @@ export function PlanillaForm({
   fecha,
   inicial,
   operariosConfigurados,
+  operariosPredeterminados,
   colores,
 }: {
   estacion: Estacion;
   fecha: string;
   inicial: Planilla | null;
   operariosConfigurados: string[];
+  /** Operarios que se marcan al abrir una planilla nueva (los que se dejaron elegidos la última vez; sin historial, todos). */
+  operariosPredeterminados: string[];
   colores: string[];
 }) {
   const router = useRouter();
   const [filas, setFilas] = useState<FilaForm[]>(() => (inicial && inicial.filas.length > 0 ? desdeServidor(inicial) : [vacia()]));
   const [estado, setEstado] = useState<EstadoPlanilla>(inicial?.estado ?? "BORRADOR");
   // Los operarios se eligen a mano para cada planilla (de la lista que configura técnica).
-  const [operarios, setOperarios] = useState<string[]>(inicial?.operarios ?? []);
+  const [operarios, setOperarios] = useState<string[]>(inicial?.operarios ?? operariosPredeterminados);
   const [actualizadaEn, setActualizadaEn] = useState<string | null>(inicial?.actualizado_en ?? null);
   const [modificadaPor, setModificadaPor] = useState<string | null>(inicial?.modificado_por ?? null);
   const [versiones, setVersiones] = useState(inicial?.versiones.length ?? 0);
