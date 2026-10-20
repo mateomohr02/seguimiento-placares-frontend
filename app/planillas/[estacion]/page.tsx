@@ -41,6 +41,7 @@ export default async function PlanillaPage({
         fecha={fecha}
         inicial={planilla}
         operariosConfigurados={operarios.operarios}
+        operariosPredeterminados={operarios.predeterminados[estacion] ?? operarios.operarios}
         colores={colores}
       />
     </main>
