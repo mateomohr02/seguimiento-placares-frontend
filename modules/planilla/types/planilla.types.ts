@@ -52,7 +52,7 @@ export interface Planilla {
 
 export interface DatosVersion extends VersionPlanilla {
   planilla_id: string;
-  datos: { estado: EstadoPlanilla; operarios: string[]; filas: (Omit<FilaPlanilla, "fotos"> & { fotos: number })[] };
+  datos: { estado: EstadoPlanilla; operarios: string[]; filas: (Omit<FilaPlanilla, "fotos"> & { fotos: number; fotos_lista?: FotoFila[] })[] };
 }
 
 export interface RegistroPlanilla {

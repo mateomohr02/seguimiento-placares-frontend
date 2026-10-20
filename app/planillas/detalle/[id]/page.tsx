@@ -139,8 +139,20 @@ export default async function DetallePlanillaPage({ params }: { params: Promise<
                 Versión {ver.version} — guardada por {ver.guardada_por} el {fechaHora.format(new Date(ver.guardada_en))}; reemplazada por{" "}
                 {ver.reemplazada_por} el {fechaHora.format(new Date(ver.reemplazada_en))}
               </summary>
-              <div className="mt-3">
+              <div className="mt-3 flex flex-col gap-3">
                 <TablaFilas filas={ver.datos.filas} pvc={pvc} />
+                {pvc &&
+                  ver.datos.filas
+                    .filter((f) => (f.fotos_lista?.length ?? 0) > 0)
+                    .map((f) => (
+                      <div key={f.id} className="flex flex-col gap-2 rounded-lg border p-3">
+                        <div className="text-sm font-medium">
+                          Fotos del ítem {ver.datos.filas.indexOf(f) + 1} — {f.pedido_codigo || "sin pedido"}
+                          {planilla.filas.some((x) => x.id === f.id) ? "" : " (ítem quitado en la corrección)"}
+                        </div>
+                        <FotosSoloLectura fotos={f.fotos_lista!} />
+                      </div>
+                    ))}
               </div>
             </details>
           ))
