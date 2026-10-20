@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LineaBadge } from "@/components/linea-badge";
 import { EstadoBadge } from "@/components/estado-badge";
 import {
   Table,
@@ -21,6 +22,7 @@ export function ModulosTable({ modulos }: { modulos: Modulo[] }) {
         <TableRow>
           <TableHead>ID</TableHead>
           <TableHead>Descripción</TableHead>
+          <TableHead>Línea</TableHead>
           <TableHead>Piezas</TableHead>
           <TableHead>Estado</TableHead>
         </TableRow>
@@ -38,6 +40,7 @@ export function ModulosTable({ modulos }: { modulos: Modulo[] }) {
                 {modulo.descripcion}
               </Link>
             </TableCell>
+            <TableCell>{modulo.linea && <LineaBadge linea={modulo.linea} />}</TableCell>
             <TableCell>{modulo.despieceTiposCount}</TableCell>
             <TableCell>
               <EstadoBadge estado={modulo.estado} />

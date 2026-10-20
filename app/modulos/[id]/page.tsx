@@ -6,6 +6,7 @@ import { PiezasTable } from "@/modules/pieza/components/piezas-table";
 import type { Pieza } from "@/modules/pieza/types/pieza.types";
 import type { ModuloConContexto } from "@/modules/modulo/types/modulo.types";
 import { EstadoBadge } from "@/components/estado-badge";
+import { LineaBadge } from "@/components/linea-badge";
 
 export default async function ModuloDetallePage({
   params,
@@ -33,11 +34,12 @@ export default async function ModuloDetallePage({
             </VolverLink>
           )}
         </div>
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           <h1 className="text-xl font-semibold">
             Módulo {modulo.idEscena} — {modulo.descripcion}
           </h1>
           <EstadoBadge estado={modulo.estado} />
+          {modulo.linea && <LineaBadge linea={modulo.linea} />}
         </div>
       </div>
 

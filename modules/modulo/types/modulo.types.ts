@@ -1,3 +1,5 @@
+import type { Linea } from "@/lib/linea";
+
 export type ModuloEstado = "PENDIENTE" | "EN_PRODUCCION" | "FINALIZADO" | "ELIMINADO";
 
 export interface Modulo {
@@ -5,6 +7,7 @@ export interface Modulo {
   idEscena: number;
   descripcion: string;
   estado: ModuloEstado;
+  linea: Linea;
   despieceTiposCount: number;
 }
 
