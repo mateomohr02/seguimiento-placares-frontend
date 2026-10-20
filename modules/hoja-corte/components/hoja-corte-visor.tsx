@@ -329,7 +329,7 @@ export function HojaCorteVisor({
   const cssWidth = Math.round(ancho * zoom);
 
   return (
-    <div className="flex h-dvh flex-col bg-muted">
+    <div className="flex h-[calc(100dvh-var(--barra-h))] flex-col bg-muted">
       <header className="flex flex-wrap items-center gap-2 border-b bg-background px-3 py-2">
         <VolverLink
           href={volverHref}

@@ -57,6 +57,7 @@
      carbón (#1A1A1A, encabezados/botones), bronce (#9C7A4C, acento), beige
      cálido (#F4F2EF, bandas de tabla) y grises cálidos para texto/bordes.
      Tema claro: fondo blanco, letra oscura. */
+  --barra-h: 5.75rem; /* alto de la barra de navegación: dos filas en celular (pantallas completas lo descuentan) */
   --background: #ffffff;
   --foreground: #1a1a1a;
   --card: #ffffff;
@@ -90,6 +91,13 @@
   --sidebar-accent-foreground: #1a1a1a;
   --sidebar-border: #e2ded8;
   --sidebar-ring: #9c7a4c;
+}
+
+/* Desde lg la barra de navegación es de una sola fila. */
+@media (min-width: 1024px) {
+  :root {
+    --barra-h: 3.5rem;
+  }
 }
 
 .dark {
@@ -171,5 +179,45 @@ html {
   }
   50% {
     top: 90%;
+  }
+}
+
+/* Cambio de tabla en Registros: la que sale se desliza y se desvanece hacia un lado y la que entra viene del otro
+   (--dir vale 1 o -1 según el sentido). */
+@keyframes tabla-entra {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--dir, 1) * 2.5rem));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes tabla-sale {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(calc(var(--dir, 1) * -2.5rem));
+  }
+}
+
+.tabla-entra {
+  animation: tabla-entra 260ms ease-out both;
+}
+
+.tabla-sale {
+  animation: tabla-sale 200ms ease-in both;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabla-entra,
+  .tabla-sale {
+    animation-duration: 1ms;
   }
 }

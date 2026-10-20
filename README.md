@@ -52,6 +52,9 @@ app/frontend/
 │   ├── pedidos/[id]/escenas/[escenaId]/page.tsx  # Visor 3D de una escena (+ escenas/subir/route.ts, proxy de subida)
 │   ├── texturas-3d/[catalogo]/[material]/route.ts # Route handler: proxy de las texturas de las escenas 3D hacia el backend
 │   ├── hojas-corte/[id]/ · documentos-pedido/[id]/ · planos-pedido/[id]/   # Route handlers: proxys de /archivo y /anotaciones hacia el backend (el navegador no habla con el backend)
+│   ├── planillas/                 # Termolaminado: [estacion]/page.tsx (formulario de Lijado/Encolado/PVC), registros/, indicadores/, trazabilidad/, detalle/[id]/, configuracion/ (estados, y por usuario: estado, planillas y operarios)
+│   ├── planillas-api/             # Route handlers proxy del formulario (guardado de la planilla, fotos, sugerencias de pedido, configuración por usuario y estados)
+│   ├── planificacion/             # Planificación semanal por sistema: page.tsx (semana con pedidos y reclamos, marcado de estados y alta/edición de filas para técnica)
 │   ├── red/estado/route.ts       # Endpoint que consulta el comprobador de red (responde si el frontend y el backend están vivos)
 │   ├── loading.tsx               # Pantalla de carga (tres puntos) mientras una página pide sus datos
 │   └── layout.tsx                # Estructura común a todas las páginas (fuente, tema, notificaciones)
@@ -64,15 +67,18 @@ app/frontend/
 │   ├── documento-pedido/          # Documentación del pedido: tipos, carga con verificación (lib/analizar-pdf.ts), listado
 │   ├── plano-pedido/              # Planos del pedido: carga, miniaturas, listado
 │   ├── escena-pedido/             # Escenas 3D del pedido (.3d de TeoWin), solo lectura: listado, carga, eliminar y visor three.js (components/escena-visor.tsx)
+│   ├── planilla/                  # Planillas de Termolaminado: formulario con borrador automático (planilla-form.tsx), fotos de PVC (fotos-fila.tsx), operarios, filtros, tipos
+│   ├── planificacion/             # Planificación semanal: tabla, diálogo de carga, marcado de estados (server actions) y tipos
 │   └── auth/                       # Login por PIN: acción de login/logout y pantalla con teclado numérico
 ├── components/
+│   ├── barra-navegacion.tsx       # Barra superior global (en el layout, con sesión): enlaces según permisos + usuario; nav-links.tsx resalta la página actual. Alto fijo `--barra-h` (globals.css): las pantallas completas (visores, escaneo) lo descuentan
 │   ├── ui/                       # Componentes genéricos de shadcn/ui (botón, tabla, diálogo...) sin lógica de negocio
 │   ├── estado-badge.tsx           # La "etiqueta" de color del estado: Pendiente (outline blanco), En proceso/En producción (bronce), Finalizado/Cortada/Lista (verde)
 │   ├── confirm-action-button.tsx  # Botón + diálogo Aceptar/Cancelar. TODA acción que modifica datos pasa por acá (con `requireText`, además exige tipear una palabra)
 │   ├── column-filter.tsx           # Filtro de columna estilo Excel (lista de valores con checkbox + búsqueda)
 │   ├── network-guard.tsx           # Comprobador de red: cubre la app con un aviso si el dispositivo no llega al servidor
 │   ├── volver-link.tsx            # Botón "volver" único de la app (variantes claro, acento y vidrio); usarlo siempre en vez de links de texto
-│   ├── logo-neostone.tsx          # Logo de Neostone (public/logo-neostone.png, blanco sobre transparente; se tiñe al carbón de la paleta con filtros CSS). Se ve en el login y arriba a la izquierda del listado de órdenes
+│   ├── logo-neostone.tsx          # Logo de Neostone (public/logo-neostone.png, blanco sobre transparente; se tiñe al carbón de la paleta con filtros CSS). Se ve en el login y en la barra de navegación
 │   └── loading-dots.tsx            # Tres puntos que crecen y se achican (carga de páginas y botones)
 ├── proxy.ts                        # Puerta de entrada: sin sesión vigente, todo redirige a /login (salvo /login y /red/estado)
 ├── app/login/page.tsx              # Pantalla de PIN
@@ -245,15 +251,17 @@ Entrá por `https://192.168.3.NNN/`. Como el certificado es autofirmado y ahora 
 
 Al abrir la app aparece la pantalla de **PIN** (teclado numérico en pantalla; **con la tablet apaisada** —pantalla horizontal de hasta 800 px de alto— se parte en dos columnas, logo/título/puntos del PIN a un lado y el teclado al otro, para no tener que scrollear; en vertical queda en una columna; con teclado físico también sirve, con Enter para ingresar). El PIN identifica al usuario: una persona o una estación de trabajo (`rover1`, `cortadora1`, …). Con un PIN incorrecto avisa y limpia el campo; tras 8 errores seguidos se bloquea unos minutos.
 
-- La sesión dura **12 horas** (configurable en el backend) y se guarda en una cookie que el navegador no puede leer. Arriba a la derecha del listado de órdenes se ve **quién está conectado y su rol**, con el botón **Salir**. Si la sesión vence, o si dan de baja al usuario mientras la usa, la app lo manda otra vez al ingreso de PIN.
+- La sesión dura **12 horas** (configurable en el backend) y se guarda en una cookie que el navegador no puede leer. En la **barra de navegación** (arriba, en todas las pantallas) se ve **quién está conectado y su rol**, con el botón **Salir**. Si la sesión vence, o si dan de baja al usuario mientras la usa, la app lo manda otra vez al ingreso de PIN.
 - Los usuarios, roles y permisos **se administran en la base** (ver el [README del backend](../backend/README.md#9-usuarios-roles-y-permisos)); no hay pantalla de administración.
 - **La app muestra solo lo que el rol puede hacer** (y el backend lo vuelve a validar en cada acción):
 
 | Rol | Qué ve y qué puede hacer |
 |---|---|
 | `admin` / `tecnica` | Todo: agregar, archivar y eliminar órdenes; escanear y marcar piezas; subir y eliminar documentación; anotar y borrar anotaciones |
-| `fabrica` (estaciones) | Ver órdenes, pedidos, módulos, despieces y documentación; **Escanear** y **Finalizado / Pendiente** por pieza; **anotar** sobre los documentos (puede deshacer lo que anota en esa sesión, pero **no** borrar anotaciones ya guardadas). No ve "Agregar orden", Archivar ni Eliminar, ni subir/eliminar documentos |
-| `gerencia` | Solo lectura: no ve "Escanear" (entrar a `/escaneo` lo devuelve al listado), ni botones de piezas, ni "Anotar", ni subir/eliminar |
+| `fabrica` (estaciones) | Ver órdenes, pedidos, módulos, despieces y documentación; **Escanear** y **Finalizado / Pendiente** por pieza; **anotar** sobre los documentos (puede deshacer lo que anota en esa sesión, pero **no** borrar anotaciones ya guardadas); **completar las planillas de Termolaminado** y ver sus registros e indicadores. No ve "Agregar orden", Archivar ni Eliminar, ni subir/eliminar documentos |
+| `gerencia` | Solo lectura: no ve "Escanear" (entrar a `/escaneo` lo devuelve al listado), ni botones de piezas, ni "Anotar", ni subir/eliminar. Ve los registros, indicadores y la planificación de Termolaminado |
+
+La barra de navegación suma, según los permisos: **Lijado · Encolado · PVC** (solo las planillas que técnica asignó al usuario), **Planificación**, **Registros**, **Indicadores** (solo técnica, gerencia y admin; `fabrica` no los ve) y, para técnica, **Configurar** (operarios y qué planillas completa cada usuario).
 
 ### Aviso de red
 
@@ -393,6 +401,34 @@ Cada pedido puede tener una o más **escenas 3D** (el archivo `.3d` que TeoWin g
 - **Tiras de canto negras** (marcos de puertas): se dibujan como una caja del tamaño de la tira.
 - **Alcance**: muebles, paredes, pisos, zócalos, encimeras, ventanas y puertas de paso (con hueco en la pared), griferías, cortinas y la decoración de los catálogos de TeoWin. No se dibujan los herrajes (bisagras, manillones) ni el marco de cada hoja de una puerta de paso. Los catálogos de decoración y equipamiento no se animan. Detalle: `diseño.md` §13.
 - Para programar: el visor es `modules/escena-pedido/components/escena-visor.tsx` (three.js, sin dependencias de la lógica de negocio); recibe la geometría ya interpretada (`Escena3D`). Las texturas se piden por `/texturas-3d/<catálogo>/<código>`; el UV es por medida real (`TILE_*_MM`). Las animaciones son grupos de three.js (`Animable`) que `avanzarAnimaciones` desplaza; los colores de respaldo están en `COLOR_MATERIAL`.
+
+---
+
+## Seguimiento de Termolaminado
+
+Parte diario digital de las tres subestaciones, en el orden del proceso: **Lijado → Encolado → PVC**. Detalle de las decisiones: `diseño.md` §14. Usuario de la estación: `termolaminado1` (rol `fabrica`).
+
+### Cómo se completa una planilla (`Lijado`, `Encolado` o `PVC` en la barra)
+
+- Se abre la planilla **de hoy** (la fecha se puede cambiar arriba; si ya hay una de ese día, se abre esa). Cada **ítem** es un pedido trabajado: **N° de pedido** (mayúsculas, con sugerencias), **hora de inicio y fin** en formato de 24 horas (se escriben solo los números, `1545` → `15:45`; el botón **Ahora** pone la hora actual) y la **cantidad de piezas**; en PVC, en cambio, **Mesa chica** y **Mesa grande** (las piezas son la suma), **Colores** (código en mayúsculas, sin puntos, con sugerencias de los ya usados), **Colocación PVC** y **Corte y perfilado**; y **Observaciones**. **Agregar ítem** suma una fila; **Quitar** la saca.
+- **Borrador automático**: todo lo que se escribe se guarda solo en el servidor unos instantes después ("Borrador guardado …"); si se cierra la sesión, se apaga la tablet o se recarga la página, **lo cargado sigue ahí**. Mientras tanto la planilla figura como **Borrador**.
+- **Guardar planilla** la cierra (queda **Guardada**). Cada ítem necesita pedido, hora de inicio y cantidad; si falta algo, avisa cuál. Una planilla guardada **se puede corregir**: se editan los datos y se toca **Guardar cambios**; la app conserva la **versión anterior** (quién, cuándo) y se ve en el historial del detalle.
+- **Fotos (solo PVC)**: en cada ítem, **Sacar foto** abre la cámara (o **Elegir de la galería**); se pueden subir varias, se ven como miniaturas, se amplían al tocarlas y se borran con la ×. La foto de la pieza se saca antes de termolaminar. (En un ítem recién agregado, la app lo guarda antes de subir la foto.)
+- **Operarios**: en el encabezado se tocan los que trabajaron en esa planilla (los botones son los operarios que técnica le configuró a ese usuario). Quedan guardados con su nombre: cambiar la lista después no altera la planilla.
+
+### Planificación semanal (`Planificación`)
+
+La oficina técnica **carga a mano** cada semana los **pedidos** (cliente, N° TW, N° orden, modelo, color, fábrica, fecha límite) y los **reclamos** (cliente, distribuidor, ticket, N° TW, tipo, color, compromiso, finalizado, observaciones). Todos los usuarios la ven en `/planificacion` (la semana actual primero; flechas para cambiar de semana y lista de las que tienen datos).
+
+- **Marcar estados**: a cada usuario de fábrica, técnica le asigna un **estado de producción** (ej. «Listo Termolaminado»; varios usuarios pueden compartir el mismo). En cada fila, junto al N° TW, el usuario toca **Marcar «…»** cuando el pedido terminó en su estación (pide confirmación) y **Quitar marca** para deshacerlo. Cada fila muestra los estados marcados con su **color**, y debajo de cada etiqueta **la fecha, la hora y quién lo marcó**; la fila se tiñe con el color del último estado marcado. Sin estado asignado se ve la planificación pero no se puede marcar.
+- **Técnica** (permiso `documentacion.gestionar`) además **agrega, edita y quita** filas (botones **Agregar**, lápiz y cesto).
+
+### Registros, indicadores y trazabilidad (`planillas.ver`)
+
+- **Registros**: **una tabla por planilla** (Lijado, Encolado y PVC, cada una con sus columnas; PVC suma colores, mesas, colocación, perfilado y cantidad de **fotos**), de la que se ve **una sola a la vez**: los botones de arriba (Lijado, Encolado, PVC) cambian de tabla con un deslizamiento horizontal y los filtros de cada una se conservan. Cada usuario de fábrica ve **solo las planillas que tiene asignadas** (sin planillas asignadas, no ve Registros). Arriba se elige el rango de fechas (por defecto, los últimos 30 días). Cada tabla se filtra **por columna al estilo Excel** (ícono del embudo: lista de valores con checkbox y búsqueda, igual que en la tabla de piezas; las opciones de cada columna salen de las filas que cumplen los demás filtros) y su **recuento sigue a los filtros** ("3 de 20 registros · 5 de 261 piezas"; "Limpiar filtros" por tabla). Enlaces al **detalle** de la planilla (ítems, fotos ampliables, historial de correcciones) y, tocando un N° de pedido, a su trazabilidad.
+- **Indicadores**: por estación (piezas, pedidos, días con carga, tiempo trabajado, piezas por hora), piezas por día y la situación de los pedidos del período (los que pasaron por las tres estaciones, los que faltan y los que tienen **cantidad de piezas distinta** entre estaciones). Incluyen también los borradores.
+- **Trazabilidad de un pedido** (`/planillas/trazabilidad?pedido=`): por qué estaciones pasó, cuándo y cuántas piezas en cada una.
+- **Configurar** (`planillas.configurar`, técnica): el catálogo de **estados de producción** (con el **color** de cada uno: paleta o selector libre) y, para cada usuario de fábrica, su **estado**, las **planillas que completa** y los **operarios** de su estación (en cada planilla se eligen a mano). Cada cambio se guarda al instante; el usuario lo ve al recargar la página.
 
 ---
 

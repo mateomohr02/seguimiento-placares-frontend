@@ -8,7 +8,7 @@ export default async function EscaneoPage() {
   const sesion = await getClaveSesion();
   if (!sesion) redirect("/login");
   return (
-    <div className="h-dvh w-full">
+    <div className="h-[calc(100dvh-var(--barra-h))] w-full">
       <EscanerCamara claveSesion={sesion.clave} expiraEn={sesion.expiraEn} />
     </div>
   );
