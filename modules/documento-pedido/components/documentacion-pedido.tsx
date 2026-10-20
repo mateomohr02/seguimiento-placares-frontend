@@ -7,7 +7,9 @@ import {
   ETIQUETA_TIPO,
   TIPOS_ADICIONALES,
   TIPOS_OBLIGATORIOS,
+  tiposAdicionalesDe,
   type DocumentoPedido,
+  type LineaPedido,
   type TipoDocumento,
 } from "../types/documento-pedido.types";
 
@@ -48,16 +50,29 @@ export function DocumentacionPedido({
   pedidoId,
   codigoPedido,
   documentos,
+  lineas,
   puedeGestionar,
 }: {
   pedidoId: string;
   codigoPedido: string;
   documentos: DocumentoPedido[];
+  /** Líneas del pedido; si falta se asume ["PLACARES"]. Pedido mixto = ambas. */
+  lineas?: LineaPedido[];
   /** Subir y eliminar documentos (permiso documentacion.gestionar). */
   puedeGestionar: boolean;
 }) {
   const de = (t: TipoDocumento) => documentos.filter((d) => d.tipo === t);
+  const tiposSubibles = tiposAdicionalesDe(lineas);
+  // Se listan los ya cargados aunque su tipo no corresponda a las líneas actuales.
+  const tiposListados = TIPOS_ADICIONALES.filter((t) => tiposSubibles.includes(t) || de(t).length > 0);
   const adicionales = documentos.filter((d) => TIPOS_ADICIONALES.includes(d.tipo));
+  const soloCocinas = tiposSubibles.every((t) => t.endsWith("_COCINAS"));
+  const hayCocinas = tiposSubibles.some((t) => t.endsWith("_COCINAS"));
+  const textoAdicional = soloCocinas
+    ? "Herrajes de producción y accesorios de instalación de cocinas."
+    : hayCocinas
+      ? "Pedido mixto (placares y cocinas): escandallo de placares, y herrajes de producción y accesorios de instalación de cada línea."
+      : "Según la modulación y los modelos del pedido: escandallo, herrajes de producción y accesorios de instalación de placares.";
 
   return (
     <section id="documentacion" className="flex scroll-mt-20 flex-col gap-4">
@@ -93,15 +108,12 @@ export function DocumentacionPedido({
 
       <div className="flex flex-col gap-3 rounded-lg border p-4">
         <h3 className="font-semibold">Documentación adicional</h3>
-        <p className="text-sm text-muted-foreground">
-          Según la modulación y los modelos del pedido: escandallo, herrajes de producción y accesorios de
-          instalación (placares o cocinas).
-        </p>
+        <p className="text-sm text-muted-foreground">{textoAdicional}</p>
         {adicionales.length === 0 ? (
           <p className="text-sm text-muted-foreground">Este pedido no tiene documentación adicional cargada.</p>
         ) : (
           <div className="flex flex-col gap-3">
-            {TIPOS_ADICIONALES.filter((t) => de(t).length > 0).map((t) => (
+            {tiposListados.filter((t) => de(t).length > 0).map((t) => (
               <div key={t} className="flex flex-col gap-2">
                 <div className="text-sm font-medium">{ETIQUETA_TIPO[t]}</div>
                 <ul className="flex flex-col gap-2">
@@ -113,7 +125,7 @@ export function DocumentacionPedido({
             ))}
           </div>
         )}
-        {puedeGestionar && <DocumentoSubir pedidoId={pedidoId} codigoPedido={codigoPedido} tipos={TIPOS_ADICIONALES} />}
+        {puedeGestionar && <DocumentoSubir pedidoId={pedidoId} codigoPedido={codigoPedido} tipos={tiposSubibles} />}
       </div>
     </section>
   );
