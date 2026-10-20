@@ -52,7 +52,7 @@ export interface Planilla {
 
 export interface DatosVersion extends VersionPlanilla {
   planilla_id: string;
-  datos: { estado: EstadoPlanilla; operarios: string[]; filas: (Omit<FilaPlanilla, "fotos"> & { fotos: number })[] };
+  datos: { estado: EstadoPlanilla; operarios: string[]; filas: (Omit<FilaPlanilla, "fotos"> & { fotos: number; fotos_lista?: FotoFila[] })[] };
 }
 
 export interface RegistroPlanilla {
@@ -134,6 +134,8 @@ export interface Trazabilidad extends Omit<ResumenPedido, "estaciones"> {
 /** Operarios entre los que elige el usuario al completar sus planillas (los configura técnica). */
 export interface OperariosArea {
   operarios: string[];
+  /** Operarios que se preseleccionan en una planilla nueva de cada estación asignada (los que quedaron elegidos la última vez; sin historial, todos). */
+  predeterminados: Partial<Record<Estacion, string[]>>;
 }
 
 /** Estado de producción del catálogo (con cuántos usuarios lo tienen y cuántas marcas hizo). */

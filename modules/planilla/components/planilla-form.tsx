@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { LoadingDots } from "@/components/loading-dots";
 import { ETIQUETA_ESTACION, fechaCorta, slugEstacion } from "../lib/estaciones";
 import type { Estacion, EstadoPlanilla, FotoFila, Planilla } from "../types/planilla.types";
-import { FotosFila } from "./fotos-fila";
+import { FotosFila, subirFoto, type FotoPendiente } from "./fotos-fila";
 
 // Formulario de una planilla de producción (Lijado, Encolado o PVC) de un día. Mientras
 // es BORRADOR se guarda sola en el servidor (así no se pierde si se cierra la sesión);
@@ -32,9 +32,11 @@ interface FilaForm {
   mesa_chica: string;
   mesa_grande: string;
   fotos: FotoFila[];
+  /** Fotos de un ítem que todavía no existe en el servidor: se suben solas al guardar. */
+  pendientes: FotoPendiente[];
 }
 
-type CampoTexto = Exclude<keyof FilaForm, "key" | "id" | "fotos">;
+type CampoTexto = Exclude<keyof FilaForm, "key" | "id" | "fotos" | "pendientes">;
 
 const AUTOSAVE_MS = 1200;
 let contadorKey = 0;
@@ -53,6 +55,7 @@ const vacia = (): FilaForm => ({
   mesa_chica: "",
   mesa_grande: "",
   fotos: [],
+  pendientes: [],
 });
 
 const desdeServidor = (p: Planilla): FilaForm[] =>
@@ -70,6 +73,7 @@ const desdeServidor = (p: Planilla): FilaForm[] =>
     mesa_chica: f.mesa_chica === null ? "" : String(f.mesa_chica),
     mesa_grande: f.mesa_grande === null ? "" : String(f.mesa_grande),
     fotos: f.fotos,
+    pendientes: [],
   }));
 
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
@@ -118,19 +122,22 @@ export function PlanillaForm({
   fecha,
   inicial,
   operariosConfigurados,
+  operariosPredeterminados,
   colores,
 }: {
   estacion: Estacion;
   fecha: string;
   inicial: Planilla | null;
   operariosConfigurados: string[];
+  /** Operarios que se marcan al abrir una planilla nueva (los que se dejaron elegidos la última vez; sin historial, todos). */
+  operariosPredeterminados: string[];
   colores: string[];
 }) {
   const router = useRouter();
   const [filas, setFilas] = useState<FilaForm[]>(() => (inicial && inicial.filas.length > 0 ? desdeServidor(inicial) : [vacia()]));
   const [estado, setEstado] = useState<EstadoPlanilla>(inicial?.estado ?? "BORRADOR");
   // Los operarios se eligen a mano para cada planilla (de la lista que configura técnica).
-  const [operarios, setOperarios] = useState<string[]>(inicial?.operarios ?? []);
+  const [operarios, setOperarios] = useState<string[]>(inicial?.operarios ?? operariosPredeterminados);
   const [actualizadaEn, setActualizadaEn] = useState<string | null>(inicial?.actualizado_en ?? null);
   const [modificadaPor, setModificadaPor] = useState<string | null>(inicial?.modificado_por ?? null);
   const [versiones, setVersiones] = useState(inicial?.versiones.length ?? 0);
@@ -145,6 +152,8 @@ export function PlanillaForm({
   const estadoRef = useRef(estado);
   const cambiosRef = useRef(0);
   const cola = useRef<Promise<unknown>>(Promise.resolve());
+  const subidasRef = useRef(new Set<string>());
+  const hayPendientes = filas.some((f) => f.pendientes.length > 0);
   const sugerirTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const esPvc = estacion === "PVC";
 
@@ -153,6 +162,23 @@ export function PlanillaForm({
     operariosRef.current = operarios;
     estadoRef.current = estado;
   });
+
+  // Sube las fotos que esperaban a que su ítem existiera. Las que fallan quedan pendientes y se reintentan al próximo guardado.
+  const subirPendientes = useCallback(async (idPorKey: Map<string, string | undefined>) => {
+    const lista = filasRef.current.flatMap((f) => f.pendientes.map((p) => ({ key: f.key, filaId: f.id ?? idPorKey.get(f.key), p })));
+    for (const { key, filaId, p } of lista) {
+      if (!filaId || subidasRef.current.has(p.id)) continue;
+      subidasRef.current.add(p.id);
+      const r = await subirFoto(filaId, p.blob);
+      if ("error" in r) {
+        subidasRef.current.delete(p.id);
+        toast.error(`${r.error} La foto sigue en el equipo y se reintenta al guardar.`);
+        return;
+      }
+      URL.revokeObjectURL(p.url);
+      setFilas((prev) => prev.map((f) => (f.key === key ? { ...f, pendientes: f.pendientes.filter((x) => x.id !== p.id), fotos: [...f.fotos, r.foto] } : f)));
+    }
+  }, []);
 
   // Guarda el estado actual del formulario. Los guardados van de a uno (en cola) para que
   // una fila nueva reciba su id antes de que se mande otra vez y no se duplique.
@@ -186,6 +212,7 @@ export function PlanillaForm({
           setPlanillaId(p.id);
           setError(null);
           if (cambiosRef.current === vistos) setSucio(false);
+          await subirPendientes(new Map(enviadas.map((f, i) => [f.key, p.filas[i]?.id])));
           return { ok: true as const };
         } catch {
           const message = "No se pudo comunicar con el servidor. Los cambios siguen en pantalla.";
@@ -198,7 +225,7 @@ export function PlanillaForm({
       cola.current = tarea;
       return tarea;
     },
-    [estacion, fecha],
+    [estacion, fecha, subirPendientes],
   );
 
   // Guardado automático del borrador.
@@ -210,11 +237,11 @@ export function PlanillaForm({
 
   // Avisa antes de cerrar la pestaña con cambios sin guardar.
   useEffect(() => {
-    if (!sucio) return;
+    if (!sucio && !hayPendientes) return;
     const aviso = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", aviso);
     return () => window.removeEventListener("beforeunload", aviso);
-  }, [sucio]);
+  }, [sucio, hayPendientes]);
 
   const editar = useCallback((fn: (prev: FilaForm[]) => FilaForm[]) => {
     cambiosRef.current++;
@@ -249,8 +276,9 @@ export function PlanillaForm({
   }
 
   function quitar(f: FilaForm) {
-    const conFotos = f.fotos.length > 0;
-    if (conFotos && !window.confirm(`Esta fila tiene ${f.fotos.length} foto(s) que se van a perder. ¿Quitarla?`)) return;
+    const nFotos = f.fotos.length + f.pendientes.length;
+    if (nFotos > 0 && !window.confirm(`Este ítem tiene ${nFotos} foto(s). Si lo quitás dejan de verse en la planilla (en las que ya se subieron, queda copia en el historial). ¿Quitarlo?`)) return;
+    f.pendientes.forEach((p) => URL.revokeObjectURL(p.url));
     editar((prev) => (prev.length > 1 ? prev.filter((x) => x.key !== f.key) : [vacia()]));
   }
 
@@ -276,17 +304,15 @@ export function PlanillaForm({
     router.push(`/planillas/${slugEstacion(estacion)}?fecha=${nueva}`);
   }
 
-  // Para subir una foto hace falta que la fila ya exista en el servidor.
-  async function asegurarFila(key: string): Promise<string | null> {
-    const f = filasRef.current.find((x) => x.key === key);
-    if (f?.id) return f.id;
-    if (estadoRef.current !== "BORRADOR") {
-      toast.error("Guardá los cambios antes de agregar fotos a una fila nueva.");
-      return null;
-    }
-    const r = await guardar("BORRADOR");
-    if (!r.ok) return null;
-    return filasRef.current.find((x) => x.key === key)?.id ?? null;
+  // Las fotos de un ítem nuevo esperan en el equipo y se suben solas cuando el ítem se guarda (borrador automático o botón).
+  function agregarPendientes(key: string, items: FotoPendiente[]) {
+    editar((prev) => prev.map((f) => (f.key === key ? { ...f, pendientes: [...f.pendientes, ...items] } : f)));
+  }
+
+  function quitarPendiente(key: string, id: string) {
+    const p = filasRef.current.find((f) => f.key === key)?.pendientes.find((x) => x.id === id);
+    if (p) URL.revokeObjectURL(p.url);
+    editar((prev) => prev.map((f) => (f.key === key ? { ...f, pendientes: f.pendientes.filter((x) => x.id !== id) } : f)));
   }
 
   function setFotos(key: string, fotos: FotoFila[]) {
@@ -488,9 +514,12 @@ export function PlanillaForm({
 
             {esPvc && (
               <FotosFila
+                filaId={f.id}
                 fotos={f.fotos}
-                asegurarFila={() => asegurarFila(f.key)}
+                pendientes={f.pendientes}
                 onCambio={(fotos) => setFotos(f.key, fotos)}
+                onAgregarPendientes={(items) => agregarPendientes(f.key, items)}
+                onQuitarPendiente={(id) => quitarPendiente(f.key, id)}
               />
             )}
           </li>
@@ -523,7 +552,7 @@ export function PlanillaForm({
         <Button
           type="button"
           className="pointer-events-auto h-12 px-6 text-base shadow-lg"
-          disabled={guardando || (guardada && !sucio)}
+          disabled={guardando || (guardada && !sucio && !hayPendientes)}
           onClick={() => void cerrar()}
         >
           {guardando ? <LoadingDots /> : <CheckCircle2Icon />} {guardada ? "Guardar cambios" : "Guardar planilla"}
