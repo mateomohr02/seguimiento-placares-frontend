@@ -136,6 +136,10 @@ Si necesitás usar la cámara (Vista 5) desde una **tablet**, hace falta un paso
 
 ---
 
+## Placares y Cocinas (rama `feature/extension-cocinas`)
+
+La app sirve a **placares y cocinas**. Cada orden, pedido y módulo muestra su **línea** con un badge (`components/linea-badge.tsx`; una orden o pedido mixto muestra los dos) y el listado de órdenes tiene el filtro **Todas / Placares / Cocinas** (`?linea=`). La documentación adicional del pedido depende de `pedido.lineas` (`tiposAdicionalesDe` en `modules/documento-pedido/types/documento-pedido.types.ts`): placares ofrece escandallo, herrajes y accesorios; cocinas, solo herrajes y accesorios (no hay escandallo de cocinas); un pedido mixto ve ambos. El flujo de escaneo y de piezas es el mismo para las dos líneas. El visor 3D usa colores por catálogo (`COLOR_MATERIAL_CAT`). Detalle en `diseño.md` §16.
+
 ## Flujo de ramas (git)
 
 Detalle en `diseño.md` §15 (vale para este repo y el otro).
