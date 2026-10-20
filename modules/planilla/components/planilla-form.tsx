@@ -512,15 +512,22 @@ export function PlanillaForm({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" className="h-12 px-6 text-base" disabled={guardando || (guardada && !sucio)} onClick={() => void cerrar()}>
+      {!guardada && (
+        <span className="flex items-center gap-1 text-sm text-muted-foreground">
+          <ClockIcon className="size-4" /> Mientras no la guardes queda como borrador ({ETIQUETA_ESTACION[estacion]} del {fechaCorta(fecha)}).
+        </span>
+      )}
+
+      {/* Flota en la esquina inferior derecha mientras el formulario está en pantalla (sticky: no sale del área del formulario). */}
+      <div className="pointer-events-none sticky bottom-4 z-20 self-end">
+        <Button
+          type="button"
+          className="pointer-events-auto h-12 px-6 text-base shadow-lg"
+          disabled={guardando || (guardada && !sucio)}
+          onClick={() => void cerrar()}
+        >
           {guardando ? <LoadingDots /> : <CheckCircle2Icon />} {guardada ? "Guardar cambios" : "Guardar planilla"}
         </Button>
-        {!guardada && (
-          <span className="flex items-center gap-1 text-sm text-muted-foreground">
-            <ClockIcon className="size-4" /> Mientras no la guardes queda como borrador ({ETIQUETA_ESTACION[estacion]} del {fechaCorta(fecha)}).
-          </span>
-        )}
       </div>
     </div>
   );
