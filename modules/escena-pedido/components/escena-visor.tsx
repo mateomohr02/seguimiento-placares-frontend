@@ -149,6 +149,21 @@ function texturaConJuntas(tex: THREE.Texture, lista: THREE.Texture[]): THREE.Tex
   return t;
 }
 
+/**
+ * ¿Es un módulo de producción (se lista y se puede aislar)? Cocinas (catálogo 3), placares (4) y los catálogos comerciales
+ * (6 dígitos, ej. 100242). El resto es decoración y equipamiento de la escena (lámparas 652/507, electrodomésticos 637,
+ * ventanas y puertas de paso, encimeras 636…): se siguen dibujando en la escena completa, pero no son un mueble a fabricar.
+ * Se decide por el catálogo del módulo, así vale también para las escenas guardadas con versiones viejas del intérprete.
+ */
+function esModuloDeProduccion(m: { catalogo: string }): boolean {
+  return m.catalogo === "3" || m.catalogo === "4" || /^\d{6,}$/.test(m.catalogo);
+}
+
+/** Pieza de la mesada: contorno o losa del catálogo 636, o trozo reconstruido (`<636>MAT` / `enci`). */
+function esMesada(p: { k?: string; m: string }): boolean {
+  return p.k === "636" || p.m === "enci" || p.m.startsWith("<636>");
+}
+
 type MatVisor = THREE.MeshLambertMaterial | THREE.MeshBasicMaterial | THREE.MeshMatcapMaterial;
 
 interface Animable {
@@ -166,6 +181,8 @@ function construirGrupos(escena: Escena3D) {
   const modulos = new THREE.Group();
   const geoms: THREE.BufferGeometry[] = [];
   const mats: THREE.Material[] = [];
+  /** Piezas de la mesada (se pueden ocultar). */
+  const mesadas: THREE.Object3D[] = [];
   /** Materiales que esperan una textura, por clave "catálogo/código". */
   const porClave = new Map<string, MatVisor[]>();
   const cacheMat = new Map<string, MatVisor>();
@@ -223,6 +240,7 @@ function construirGrupos(escena: Escena3D) {
     geoms.push(borde.geometry);
     const obj = new THREE.Group();
     obj.add(mesh, borde);
+    if (esMesada(c)) mesadas.push(obj);
     const r = c.r;
     obj.matrixAutoUpdate = false;
     obj.matrix.set(r[0], r[1], r[2], c.t[0], r[3], r[4], r[5], c.t[1], r[6], r[7], r[8], c.t[2], 0, 0, 0, 1);
@@ -261,6 +279,7 @@ function construirGrupos(escena: Escena3D) {
     if (mm.a !== undefined) mesh.userData.anim = mm.a;
     const obj = new THREE.Group();
     obj.add(mesh);
+    if (esMesada(mm)) mesadas.push(obj);
     const r = mm.r;
     obj.matrixAutoUpdate = false;
     obj.matrix.set(r[0], r[1], r[2], mm.t[0], r[3], r[4], r[5], mm.t[1], r[6], r[7], r[8], mm.t[2], 0, 0, 0, 1);
@@ -359,14 +378,15 @@ function construirGrupos(escena: Escena3D) {
     geoms.push(g);
     pared.add(new THREE.Mesh(g, matDe(w.m ? `641/${w.m}` : null, new THREE.Color(COLOR_PARED), w.d === 1, !!w.m && !!w.t && w.t[0] <= TILE_JUNTAS_MAX_MM)));
   }
-  return { porModulo, modulos, entorno, pared, anims, porClave, geoms, mats };
+  return { porModulo, modulos, entorno, pared, anims, porClave, geoms, mats, mesadas };
 }
 
 type Grupos = ReturnType<typeof construirGrupos>;
 
 // Qué se ve: un módulo aislado, o la escena completa (con o sin paredes).
-function aplicarVista(grupos: Grupos, seleccion: number | null, paredes: boolean) {
+function aplicarVista(grupos: Grupos, seleccion: number | null, paredes: boolean, mesadas: boolean) {
   for (const [id, g] of grupos.porModulo) g.visible = seleccion === null || id === seleccion;
+  for (const o of grupos.mesadas) o.visible = mesadas;
   grupos.pared.visible = paredes && seleccion === null;
   grupos.entorno.visible = seleccion === null;
 }
@@ -434,6 +454,7 @@ export function EscenaVisor({
   const contenedor = useRef<HTMLDivElement>(null);
   const [seleccion, setSeleccion] = useState<number | null>(null); // idEscena aislado
   const [paredes, setParedes] = useState(true);
+  const [mesadas, setMesadas] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const api = useRef<Api | null>(null);
   // Hoja de puerta abierta: 0 = todas cerradas, n = se abrió la hoja n.
@@ -449,6 +470,9 @@ export function EscenaVisor({
     () => escena.animaciones.flatMap((a, i) => (a.tipo === "giro" ? [i] : [])),
     [escena.animaciones],
   );
+  const hayMesadas = useMemo(() => escena.cajas.some(esMesada) || (escena.mallas ?? []).some(esMesada), [escena]);
+  // Solo los módulos de producción (cocinas, placares): lámparas, electrodomésticos, ventanas… se dibujan pero no se listan.
+  const modulosListados = useMemo(() => escena.modulos.filter(esModuloDeProduccion), [escena.modulos]);
   const cajones = useMemo(
     () => escena.animaciones.flatMap((a, i) => (a.tipo === "cajon" ? [i] : [])),
     [escena.animaciones],
@@ -632,9 +656,9 @@ export function EscenaVisor({
   useEffect(() => {
     const actual = api.current;
     if (!actual) return;
-    aplicarVista(actual.grupos, seleccion, paredes);
+    aplicarVista(actual.grupos, seleccion, paredes, mesadas);
     actual.encuadrar(seleccion);
-  }, [seleccion, paredes, escena]);
+  }, [seleccion, paredes, mesadas, escena]);
 
   // Botón de puertas: cierra → abre la hoja 1 → abre la hoja 2 → … → cierra.
   function ciclarPuertas() {
@@ -707,6 +731,12 @@ export function EscenaVisor({
           />
           Paredes
         </label>
+        {hayMesadas && (
+          <label className="flex h-11 items-center gap-2 text-sm">
+            <input type="checkbox" checked={mesadas} onChange={(e) => setMesadas(e.target.checked)} className="size-5" />
+            Mesada
+          </label>
+        )}
         <button
           type="button"
           onClick={() => api.current?.encuadrar(seleccion, true)}
@@ -739,7 +769,7 @@ export function EscenaVisor({
           >
             Escena completa
           </button>
-          {escena.modulos.map((m) => (
+          {modulosListados.map((m) => (
             <button
               key={m.idEscena}
               type="button"
