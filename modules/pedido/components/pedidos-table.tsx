@@ -22,7 +22,7 @@ export function PedidosTable({ pedidos }: { pedidos: Pedido[] }) {
         <TableRow>
           <TableHead>N° pedido</TableHead>
           <TableHead>Cliente</TableHead>
-          <TableHead>Línea</TableHead>
+          <TableHead>Modulación</TableHead>
           <TableHead>Módulos</TableHead>
           <TableHead>Estado</TableHead>
         </TableRow>
