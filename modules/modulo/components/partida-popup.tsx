@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
@@ -22,8 +23,21 @@ export function PartidaPopup({
   volverFoco: RefObject<HTMLElement | null>;
 }) {
   const partida = modulo?.partida ?? null;
+  // En touch el popup se abre con el dedo todavía apoyado: al levantarlo, ese toque cae sobre el fondo y contaría como
+  // «toque fuera». Se ignoran los cierres por toque fuera durante un instante tras abrir (Escape y el botón sí cierran).
+  const abiertoEn = useRef(0);
+  useEffect(() => {
+    if (partida) abiertoEn.current = Date.now();
+  }, [partida]);
   return (
-    <Dialog open={!!partida} onOpenChange={(abierto) => !abierto && onClose()}>
+    <Dialog
+      open={!!partida}
+      onOpenChange={(abierto, detalle) => {
+        if (abierto) return;
+        if (detalle?.reason === "outside-press" && Date.now() - abiertoEn.current < 700) return;
+        onClose();
+      }}
+    >
       <DialogPortal>
         <DialogOverlay className="bg-black/60 supports-backdrop-filter:backdrop-blur-md" />
         <DialogPrimitive.Popup

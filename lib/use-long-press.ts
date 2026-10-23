@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import type { MouseEvent, PointerEvent } from "react";
+import type { DragEvent, MouseEvent, PointerEvent } from "react";
 
 const DELAY_POR_DEFECTO = 500;
-const TOLERANCIA_PX = 10;
+const TOLERANCIA_PX = 12;
 
 /**
  * Long-press con mouse y touch (pointer events). Se cancela si se suelta antes o si el puntero se mueve más de
@@ -16,6 +16,8 @@ export function useLongPress(onLongPress: () => void, { delay = DELAY_POR_DEFECT
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const origen = useRef<{ x: number; y: number } | null>(null);
   const disparado = useRef(false);
+  // Tipo del último puntero ("touch", "pen" o "mouse"): el menú contextual del navegador solo cuenta como long-press en touch/lápiz.
+  const tipoPuntero = useRef<string>("mouse");
   const callback = useRef(onLongPress);
   useEffect(() => {
     callback.current = onLongPress;
@@ -31,6 +33,7 @@ export function useLongPress(onLongPress: () => void, { delay = DELAY_POR_DEFECT
   return {
     onPointerDown: (e: PointerEvent) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
+      tipoPuntero.current = e.pointerType;
       disparado.current = false;
       cancelar();
       origen.current = { x: e.clientX, y: e.clientY };
@@ -47,8 +50,19 @@ export function useLongPress(onLongPress: () => void, { delay = DELAY_POR_DEFECT
     onPointerUp: cancelar,
     onPointerCancel: cancelar,
     onPointerLeave: cancelar,
-    // Evita el menú contextual (touch largo / clic derecho) sobre el elemento.
-    onContextMenu: (e: MouseEvent) => e.preventDefault(),
+    // Evita el menú contextual (touch largo / clic derecho) sobre el elemento. En touch/lápiz, el navegador lo dispara
+    // cuando detecta el long-press (el dedo se quedó quieto): sirve de respaldo si ya canceló el puntero (pointercancel
+    // al iniciar un arrastre de enlace o la selección) y el temporizador no llegó a disparar.
+    onContextMenu: (e: MouseEvent) => {
+      e.preventDefault();
+      if (tipoPuntero.current !== "mouse" && !disparado.current) {
+        cancelar();
+        disparado.current = true;
+        callback.current();
+      }
+    },
+    // Los enlaces y la fila no se arrastran: en touch, el arrastre de un enlace cancela el long-press.
+    onDragStart: (e: DragEvent) => e.preventDefault(),
     // Si el long-press ya abrió algo, el clic de la suelta no debe navegar.
     onClickCapture: (e: MouseEvent) => {
       if (disparado.current) {
@@ -61,4 +75,4 @@ export function useLongPress(onLongPress: () => void, { delay = DELAY_POR_DEFECT
 }
 
 /** Clases para que un long-press en touch no seleccione texto ni muestre el callout del navegador. */
-export const CLASES_SIN_SELECCION = "select-none [-webkit-touch-callout:none]";
+export const CLASES_SIN_SELECCION = "select-none [-webkit-touch-callout:none] [-webkit-user-drag:none] [&_a]:[-webkit-user-drag:none] [&_a]:[-webkit-touch-callout:none]";

@@ -49,12 +49,12 @@ function FilaModulo({ modulo, onPartida }: { modulo: Modulo; onPartida: (m: Modu
       {...longPress}
     >
       <TableCell className="font-medium">
-        <Link href={`/modulos/${modulo.id}`} className="inline-flex min-h-11 items-center hover:underline">
+        <Link href={`/modulos/${modulo.id}`} draggable={false} className="inline-flex min-h-11 items-center hover:underline">
           {modulo.idEscena}
         </Link>
       </TableCell>
       <TableCell>
-        <Link href={`/modulos/${modulo.id}`} className="inline-flex min-h-11 items-center hover:underline">
+        <Link href={`/modulos/${modulo.id}`} draggable={false} className="inline-flex min-h-11 items-center hover:underline">
           {modulo.descripcion}
         </Link>
       </TableCell>
