@@ -7,6 +7,7 @@ import type { Pieza } from "@/modules/pieza/types/pieza.types";
 import type { ModuloConContexto } from "@/modules/modulo/types/modulo.types";
 import { EstadoBadge } from "@/components/estado-badge";
 import { LineaBadge } from "@/components/linea-badge";
+import { PartidaEncabezado } from "@/modules/modulo/components/partida-encabezado";
 
 export default async function ModuloDetallePage({
   params,
@@ -42,6 +43,8 @@ export default async function ModuloDetallePage({
           {modulo.linea && <LineaBadge linea={modulo.linea} />}
         </div>
       </div>
+
+      <PartidaEncabezado partida={modulo.partida ?? null} />
 
       <PiezasTable piezas={piezas} puedeMarcar={puede(sesion, PERMISOS.PIEZAS_MARCAR)} resaltarId={piezaId} />
     </main>
