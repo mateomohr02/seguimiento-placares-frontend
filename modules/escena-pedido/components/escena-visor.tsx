@@ -109,8 +109,12 @@ export const urlTextura = (clave: string) => {
   return `/texturas-3d/${clave.slice(0, i)}/${encodeURIComponent(clave.slice(i + 1))}`;
 };
 
-// UV de una caja en milímetros: cada cara repite la textura según su medida real.
-function escalarUvCaja(g: THREE.BoxGeometry, l: number, h: number, p: number, tile: number) {
+// UV de una caja en milímetros: cada cara repite la textura según su medida real (1200 mm por baldosa en ambos ejes).
+// Las imágenes de los tableros tienen la veta a lo largo del eje v. `veta` (eje local de la caja: 0 = L, 1 = H, 2 = P) dice por dónde
+// debe correr la veta de la pieza (marca orient/texV de TeoWin): en las caras cuyo eje u es ese eje se intercambian u y v (la veta pasa a
+// correr por u); en las que ya lo tienen en v, o no contienen ese eje, queda igual. Sin `veta` el resultado es el de siempre.
+// Caras de BoxGeometry: +x, -x (u = P, v = H), +y, -y (u = L, v = P), +z, -z (u = L, v = H).
+function escalarUvCaja(g: THREE.BoxGeometry, l: number, h: number, p: number, tile: number, veta?: 0 | 1 | 2) {
   const uv = g.attributes.uv as THREE.BufferAttribute;
   const dims = [
     [p, h],
@@ -120,10 +124,15 @@ function escalarUvCaja(g: THREE.BoxGeometry, l: number, h: number, p: number, ti
     [l, h],
     [l, h],
   ];
+  const ejeU = [2, 2, 0, 0, 0, 0];
   for (let f = 0; f < 6; f++) {
+    const girar = veta !== undefined && ejeU[f] === veta;
     for (let k = 0; k < 4; k++) {
       const i = f * 4 + k;
-      uv.setXY(i, (uv.getX(i) * dims[f][0]) / tile, (uv.getY(i) * dims[f][1]) / tile);
+      const u = (uv.getX(i) * dims[f][0]) / tile;
+      const v = (uv.getY(i) * dims[f][1]) / tile;
+      if (girar) uv.setXY(i, v, u);
+      else uv.setXY(i, u, v);
     }
   }
   uv.needsUpdate = true;
@@ -230,7 +239,7 @@ function construirGrupos(escena: Escena3D) {
     const g = new THREE.BoxGeometry(c.s[0], c.s[1], c.s[2]);
     g.translate(c.s[0] / 2, c.s[1] / 2, c.s[2] / 2);
     // Una foto de paisaje (PSJ) cubre la cara una sola vez; el resto repite la textura por medida real.
-    if (c.p !== 1) escalarUvCaja(g, c.s[0], c.s[1], c.s[2], TILE_MUEBLE_MM);
+    if (c.p !== 1) escalarUvCaja(g, c.s[0], c.s[1], c.s[2], TILE_MUEBLE_MM, c.v);
     geoms.push(g);
     const cat = c.k ?? catalogoDe.get(c.mod ?? -1) ?? CAT_DEFECTO;
     const mat = matDe(c.m ? `${cat}/${c.m}` : null, colorCaja(cat, c.m, c.c), false, false, c.o ?? 1, c.p === 1);
