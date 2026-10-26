@@ -463,7 +463,8 @@ export function EscenaVisor({
   const contenedor = useRef<HTMLDivElement>(null);
   const [seleccion, setSeleccion] = useState<number | null>(null); // idEscena aislado
   const [paredes, setParedes] = useState(true);
-  const [mesadas, setMesadas] = useState(true);
+  // Destildada por defecto: la mesada es decorativa y TeoWin no la muestra en varias escenas (el archivo no dice cuándo); se tilda para verla.
+  const [mesadas, setMesadas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const api = useRef<Api | null>(null);
   // Hoja de puerta abierta: 0 = todas cerradas, n = se abrió la hoja n.
