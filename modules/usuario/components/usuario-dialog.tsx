@@ -80,7 +80,8 @@ export function UsuarioDialog({
   const [error, setError] = useState<string | null>(null);
   const [pendiente, startTransition] = useTransition();
 
-  const roles = ROLES.filter((r) => r !== "admin" || esAdmin || usuario?.rol === "admin");
+  // Un usuario nuevo nunca puede ser admin; al editar, solo un admin ve la opción (o si ya lo es).
+  const roles = ROLES.filter((r) => r !== "admin" || (usuario !== undefined && (esAdmin || usuario.rol === "admin")));
   const opcionesEstacion = estaciones
     .filter((e) => e.activa || v.estaciones_ids.includes(e.id) || usuario?.estaciones.some((x) => x.id === e.id))
     .map((e) => ({ id: e.id, etiqueta: e.nombre, detalle: e.activa ? undefined : "inactiva" }));
