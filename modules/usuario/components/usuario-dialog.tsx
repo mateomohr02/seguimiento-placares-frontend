@@ -60,6 +60,7 @@ export function UsuarioDialog({
   estaciones,
   esAdmin,
   soloPin,
+  esPropio,
   trigger,
 }: {
   /** Con `usuario` se edita; sin él, se da de alta. */
@@ -69,6 +70,8 @@ export function UsuarioDialog({
   /** Solo un admin puede dar o quitar el rol admin. */
   esAdmin: boolean;
   soloPin?: boolean;
+  /** Es el usuario con la sesión iniciada: nadie puede cambiarse su propio rol. */
+  esPropio?: boolean;
   trigger: ReactElement;
 }) {
   const [open, setOpen] = useState(false);
@@ -196,7 +199,13 @@ export function UsuarioDialog({
             </Campo>
             {!soloPin && (
               <Campo etiqueta="Rol">
-                <select value={v.rol} onChange={(e) => setV((p) => ({ ...p, rol: e.target.value as Rol }))} className={SELECT}>
+                <select
+                  value={v.rol}
+                  onChange={(e) => setV((p) => ({ ...p, rol: e.target.value as Rol }))}
+                  disabled={esPropio}
+                  title={esPropio ? "No podés cambiar tu propio rol." : undefined}
+                  className={SELECT}
+                >
                   {roles.map((r) => (
                     <option key={r} value={r}>
                       {ETIQUETA_ROL[r]}

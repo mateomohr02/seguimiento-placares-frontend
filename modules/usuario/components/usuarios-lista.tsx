@@ -130,6 +130,7 @@ export function UsuariosLista({
                   usuario={u}
                   estaciones={estaciones}
                   esAdmin={esAdmin}
+                  esPropio={yo}
                   trigger={
                     <Button variant="outline" className="h-11 px-3">
                       <PencilIcon /> Editar

@@ -299,6 +299,10 @@ export function PlanillaForm({
 
   async function cerrar() {
     setError(null);
+    if (operariosRef.current.length === 0) {
+      setError("Tildá al menos un operario para guardar la planilla.");
+      return;
+    }
     const r = await guardar("GUARDADA");
     if (r.ok) {
       toast.success(estadoRef.current === "GUARDADA" && versiones > 0 ? "Cambios guardados." : "Planilla guardada.");
