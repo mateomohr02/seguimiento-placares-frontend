@@ -14,12 +14,12 @@ interface Fila {
   id?: string;
   nombre: string;
   color: string | null;
-  usuarios: number;
+  estaciones: number;
   marcas: number;
 }
 
-// Catálogo de estados de producción (ej. "Listo Termolaminado"). Se asignan a cada usuario más abajo; un estado
-// puede tener varios usuarios. No se puede quitar uno que ya está asignado o que ya se marcó en la planificación.
+// Catálogo de estados de producción (ej. "Listo Termolaminado"). Se asignan a cada estación de trabajo más abajo; un estado
+// puede tener varias estaciones. No se puede quitar uno que ya está asignado o que ya se marcó en la planificación.
 export function EstadosForm({ inicial }: { inicial: EstadoProduccion[] }) {
   const router = useRouter();
   const [filas, setFilas] = useState<Fila[]>(inicial);
@@ -85,7 +85,7 @@ export function EstadosForm({ inicial }: { inicial: EstadoProduccion[] }) {
             </div>
             {f.id && (
               <span className="text-xs text-muted-foreground">
-                {f.usuarios} usuario{f.usuarios === 1 ? "" : "s"} · {f.marcas} marca{f.marcas === 1 ? "" : "s"}
+                {f.estaciones} estaci{f.estaciones === 1 ? "ón" : "ones"} · {f.marcas} marca{f.marcas === 1 ? "" : "s"}
               </span>
             )}
             <Button
@@ -102,7 +102,7 @@ export function EstadosForm({ inicial }: { inicial: EstadoProduccion[] }) {
         {filas.length === 0 && <li className="text-sm text-muted-foreground">Todavía no hay estados de producción.</li>}
       </ul>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" variant="outline" className="h-11 px-4" onClick={() => setFilas((p) => [...p, { nombre: "", color: PALETA_ESTADOS[filas.length % PALETA_ESTADOS.length], usuarios: 0, marcas: 0 }])}>
+        <Button type="button" variant="outline" className="h-11 px-4" onClick={() => setFilas((p) => [...p, { nombre: "", color: PALETA_ESTADOS[filas.length % PALETA_ESTADOS.length], estaciones: 0, marcas: 0 }])}>
           <PlusIcon /> Agregar estado
         </Button>
         <Button type="submit" className="h-11 px-5" disabled={guardando}>

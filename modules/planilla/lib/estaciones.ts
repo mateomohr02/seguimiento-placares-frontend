@@ -12,6 +12,10 @@ export function estacionDeSlug(slug: string): Estacion | null {
   return (ESTACIONES as string[]).includes(e) ? (e as Estacion) : null;
 }
 
+/** Ruta de la planilla de un tipo en una estación de trabajo (y, opcionalmente, de un día). */
+export const rutaPlanilla = (tipo: Estacion, estacionTrabajoId: string, fecha?: string) =>
+  `/planillas/${slugEstacion(tipo)}/${encodeURIComponent(estacionTrabajoId)}${fecha ? `?fecha=${fecha}` : ""}`;
+
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** Fecha de hoy (AAAA-MM-DD) según el reloj del equipo donde corre. */

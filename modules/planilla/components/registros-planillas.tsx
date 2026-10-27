@@ -7,7 +7,7 @@ import { ColumnFilter } from "@/components/column-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ETIQUETA_ESTACION, fechaCorta, slugEstacion } from "../lib/estaciones";
+import { ETIQUETA_ESTACION, fechaCorta, rutaPlanilla, slugEstacion } from "../lib/estaciones";
 import type { Estacion, RegistroPlanilla } from "../types/planilla.types";
 
 // Registros de producción de Termolaminado: una tabla por planilla (Lijado, Encolado y PVC), cada una con sus columnas y
@@ -30,6 +30,7 @@ interface Col {
 const v = (x: string | number | null) => (x === null || x === "" ? "—" : String(x));
 
 const COL_FECHA: Col = { key: "fecha", label: "Fecha", value: (r) => fechaCorta(r.fecha), sortKey: (r) => r.fecha, filtrable: true, className: "whitespace-nowrap" };
+const COL_ESTACION: Col = { key: "estacion", label: "Estación", value: (r) => r.estacion_trabajo?.nombre ?? "—", filtrable: true, className: "whitespace-nowrap" };
 const COL_PEDIDO: Col = {
   key: "pedido",
   label: "N° pedido",
@@ -64,10 +65,11 @@ const COL_ESTADO: Col = {
 };
 
 const COLUMNAS: Record<Estacion, Col[]> = {
-  LIJADO: [COL_FECHA, COL_PEDIDO, COL_INICIO, COL_FIN, COL_PIEZAS, COL_OPERARIOS, COL_OBS, COL_ESTADO],
-  ENCOLADO: [COL_FECHA, COL_PEDIDO, COL_INICIO, COL_FIN, COL_PIEZAS, COL_OPERARIOS, COL_OBS, COL_ESTADO],
+  LIJADO: [COL_FECHA, COL_ESTACION, COL_PEDIDO, COL_INICIO, COL_FIN, COL_PIEZAS, COL_OPERARIOS, COL_OBS, COL_ESTADO],
+  ENCOLADO: [COL_FECHA, COL_ESTACION, COL_PEDIDO, COL_INICIO, COL_FIN, COL_PIEZAS, COL_OPERARIOS, COL_OBS, COL_ESTADO],
   PVC: [
     COL_FECHA,
+    COL_ESTACION,
     COL_PEDIDO,
     COL_INICIO,
     COL_FIN,
@@ -105,13 +107,14 @@ const ordenar = (a: string, b: string) => a.localeCompare(b, "es", { numeric: tr
 function TablaEstacion({
   estacion,
   registros,
-  puedeAbrir,
+  abrible,
   seleccion,
   setSeleccion,
 }: {
   estacion: Estacion;
   registros: RegistroPlanilla[];
-  puedeAbrir: boolean;
+  /** ¿Puede abrir la planilla de esa estación de trabajo? */
+  abrible: (r: RegistroPlanilla) => boolean;
   seleccion: Seleccion;
   setSeleccion: (fn: (s: Seleccion) => Seleccion) => void;
 }) {
@@ -203,10 +206,10 @@ function TablaEstacion({
                   <Link href={`/planillas/detalle/${r.planilla_id}`} className="text-sm underline-offset-4 hover:underline">
                     Detalle
                   </Link>
-                  {puedeAbrir && (
+                  {abrible(r) && (
                     <>
                       {" · "}
-                      <Link href={`/planillas/${slugEstacion(r.estacion)}?fecha=${r.fecha}`} className="text-sm underline-offset-4 hover:underline">
+                      <Link href={rutaPlanilla(r.estacion, r.estacion_trabajo.id, r.fecha)} className="text-sm underline-offset-4 hover:underline">
                         Abrir
                       </Link>
                     </>
@@ -223,7 +226,20 @@ function TablaEstacion({
 
 const MS_SALIDA = 200;
 
-export function RegistrosPlanillas({ registros, abribles, estaciones }: { registros: RegistroPlanilla[]; abribles: Estacion[]; estaciones: Estacion[] }) {
+/** `estacionesAbribles`: ids de las estaciones de trabajo cuyas planillas puede abrir el usuario (`todas` = técnica/admin, cualquiera). */
+export function RegistrosPlanillas({
+  registros,
+  abribles,
+  estacionesAbribles,
+  todas,
+  estaciones,
+}: {
+  registros: RegistroPlanilla[];
+  abribles: Estacion[];
+  estacionesAbribles: string[];
+  todas: boolean;
+  estaciones: Estacion[];
+}) {
   const porEstacion = useMemo(
     () => Object.fromEntries(estaciones.map((e) => [e, registros.filter((r) => r.estacion === e)])) as Record<Estacion, RegistroPlanilla[]>,
     [registros, estaciones],
@@ -250,7 +266,7 @@ export function RegistrosPlanillas({ registros, abribles, estaciones }: { regist
     <TablaEstacion
       estacion={e}
       registros={porEstacion[e]}
-      puedeAbrir={abribles.includes(e)}
+      abrible={(r) => abribles.includes(e) && (todas || estacionesAbribles.includes(r.estacion_trabajo.id))}
       seleccion={selecciones[e] ?? {}}
       setSeleccion={(fn) => setSelecciones((p) => ({ ...p, [e]: fn(p[e] ?? {}) }))}
     />

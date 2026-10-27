@@ -1,49 +1,69 @@
-import { notFound } from "next/navigation";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { ChevronRightIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api/api-client";
 import { requireSesion } from "@/lib/auth/sesion";
-import { puedeCompletarPlanilla } from "@/lib/auth/permisos";
-import { ETIQUETA_ESTACION, estacionDeSlug, FECHA_RE, hoyLocal, slugEstacion } from "@/modules/planilla/lib/estaciones";
-import type { OperariosArea, Planilla } from "@/modules/planilla/types/planilla.types";
-import { PlanillaForm } from "@/modules/planilla/components/planilla-form";
+import { PERMISOS, estacionesConPlanilla, puede, puedeCompletarPlanilla } from "@/lib/auth/permisos";
+import { ETIQUETA_ESTACION, estacionDeSlug, FECHA_RE, rutaPlanilla } from "@/modules/planilla/lib/estaciones";
+import type { EstacionTrabajo } from "@/modules/estacion-trabajo/types/estacion-trabajo.types";
 
-export default async function PlanillaPage({
+// Inicio de las planillas de un tipo (Lijado, Encolado o PVC). Una planilla es de una estación de trabajo, así que
+// si el usuario está en una sola estación con ese tipo entra directo; si está en varias, elige en cuál. Técnica y
+// admin (planillas.configurar) pueden abrir las de cualquier estación activa que la tenga.
+export default async function InicioPlanillaPage({
   params,
   searchParams,
 }: {
   params: Promise<{ estacion: string }>;
-  searchParams: Promise<{ fecha?: string }>;
+  searchParams: Promise<{ fecha?: string; elegir?: string }>;
 }) {
-  const estacion = estacionDeSlug((await params).estacion);
-  if (!estacion) notFound();
+  const tipo = estacionDeSlug((await params).estacion);
+  if (!tipo) notFound();
   const sesion = await requireSesion();
-  if (!puedeCompletarPlanilla(sesion, estacion.toUpperCase())) notFound();
+  if (!puedeCompletarPlanilla(sesion, tipo)) notFound();
 
-  const pedida = (await searchParams).fecha;
-  const fecha = pedida && FECHA_RE.test(pedida) ? pedida : hoyLocal();
+  const query = await searchParams;
+  const pedida = query.fecha;
+  const fecha = pedida && FECHA_RE.test(pedida) ? pedida : undefined;
 
-  const [planilla, operarios, colores] = await Promise.all([
-    apiFetch<Planilla | null>(`/planillas/dia/${slugEstacion(estacion)}/${fecha}`),
-    apiFetch<OperariosArea>("/planillas/operarios"),
-    apiFetch<string[]>("/planillas/colores"),
-  ]);
+  const todas = puede(sesion, PERMISOS.PLANILLAS_CONFIGURAR);
+  const estaciones: { id: string; nombre: string }[] = todas
+    ? (await apiFetch<EstacionTrabajo[]>("/estaciones-trabajo")).filter((e) => e.activa && e.planillas.includes(tipo))
+    : estacionesConPlanilla(sesion, tipo);
+
+  if (estaciones.length === 1 && query.elegir !== "1") redirect(rutaPlanilla(tipo, estaciones[0].id, fecha));
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 lg:gap-3 lg:py-4">
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6">
       <div>
-        <h1 className="text-xl font-semibold">Planilla de {ETIQUETA_ESTACION[estacion]}</h1>
-        <p className="text-sm text-muted-foreground lg:hidden">
-          Parte diario de Termolaminado. Se completa durante el día; lo que cargues queda guardado como borrador hasta que la guardes.
+        <h1 className="text-xl font-semibold">Planilla de {ETIQUETA_ESTACION[tipo]}</h1>
+        <p className="text-sm text-muted-foreground">
+          {estaciones.length > 0
+            ? "Elegí la estación de trabajo en la que estás completando la planilla."
+            : `No hay ninguna estación de trabajo con la planilla de ${ETIQUETA_ESTACION[tipo]}.`}
         </p>
       </div>
-      <PlanillaForm
-        key={`${estacion}-${fecha}`}
-        estacion={estacion}
-        fecha={fecha}
-        inicial={planilla}
-        operariosConfigurados={operarios.operarios}
-        operariosPredeterminados={operarios.predeterminados[estacion] ?? operarios.operarios}
-        colores={colores}
-      />
+      {estaciones.length === 0 ? (
+        <p className="rounded-lg border border-gold/50 bg-gold/10 p-4 text-sm">
+          {todas
+            ? "Asignale esta planilla a una estación en Termolaminado > Configurar."
+            : `No estás en ninguna estación con la planilla de ${ETIQUETA_ESTACION[tipo]}. Pedile a técnica que te asigne a una.`}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {estaciones.map((e) => (
+            <li key={e.id}>
+              <Link
+                href={rutaPlanilla(tipo, e.id, fecha)}
+                className="flex min-h-14 items-center justify-between gap-3 rounded-lg border px-4 py-3 text-base font-medium transition hover:bg-muted active:scale-[0.99]"
+              >
+                {e.nombre}
+                <ChevronRightIcon className="size-5 text-muted-foreground" aria-hidden />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   );
 }

@@ -2,11 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api/api-client";
 import { requireSesion } from "@/lib/auth/sesion";
-import { PERMISOS, puede, puedeCompletarPlanilla } from "@/lib/auth/permisos";
+import { PERMISOS, puede, puedeAbrirPlanillaDe } from "@/lib/auth/permisos";
 import { Badge } from "@/components/ui/badge";
 import { VolverLink } from "@/components/volver-link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ETIQUETA_ESTACION, fechaCorta, slugEstacion } from "@/modules/planilla/lib/estaciones";
+import { ETIQUETA_ESTACION, fechaCorta, rutaPlanilla } from "@/modules/planilla/lib/estaciones";
 import { FotosSoloLectura } from "@/modules/planilla/components/fotos-fila";
 import type { DatosVersion, FilaPlanilla, Planilla } from "@/modules/planilla/types/planilla.types";
 
@@ -87,19 +87,19 @@ export default async function DetallePlanillaPage({ params }: { params: Promise<
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">
-            {ETIQUETA_ESTACION[planilla.estacion]} — {fechaCorta(planilla.fecha)}
+            {ETIQUETA_ESTACION[planilla.estacion]} — {planilla.estacion_trabajo.nombre} — {fechaCorta(planilla.fecha)}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Operarios: {planilla.operarios.join(", ") || "sin configurar"} · creada por {planilla.creado_por} el{" "}
+            Operarios: {planilla.operarios.map((o) => o.nombre).join(", ") || "sin operarios"} · creada por {planilla.creado_por} el{" "}
             {fechaHora.format(new Date(planilla.creado_en))} · última modificación de {planilla.modificado_por} el{" "}
             {fechaHora.format(new Date(planilla.actualizado_en))}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={planilla.estado === "GUARDADA" ? "default" : "secondary"}>{planilla.estado === "GUARDADA" ? "Guardada" : "Borrador"}</Badge>
-          {puedeCompletarPlanilla(sesion, planilla.estacion) && (
+          {puedeAbrirPlanillaDe(sesion, planilla.estacion, planilla.estacion_trabajo.id) && (
             <Link
-              href={`/planillas/${slugEstacion(planilla.estacion)}?fecha=${planilla.fecha}`}
+              href={rutaPlanilla(planilla.estacion, planilla.estacion_trabajo.id, planilla.fecha)}
               className="inline-flex h-10 items-center rounded-lg border px-4 text-sm font-medium hover:bg-muted"
             >
               Abrir para editar

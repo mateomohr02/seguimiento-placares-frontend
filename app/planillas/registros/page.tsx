@@ -26,7 +26,7 @@ export default async function RegistrosPage({ searchParams }: { searchParams: Pr
         <div>
           <h1 className="text-xl font-semibold">Registros de producción — Termolaminado</h1>
           <p className="text-sm text-muted-foreground">
-            Lo cargado en cada planilla, tal cual se completó, del {fechaCorta(desde)} al {fechaCorta(hasta)}. Elegí la planilla y filtrá cada columna con el ícono del embudo.
+            Lo cargado en cada planilla, tal cual se completó, del {fechaCorta(desde)} al {fechaCorta(hasta)}. Elegí la planilla y filtrá cada columna (también por estación de trabajo) con el ícono del embudo.
           </p>
         </div>
         <Link href="/planillas/trazabilidad" className="inline-flex h-10 items-center rounded-lg border px-4 text-sm font-medium hover:bg-muted">
@@ -36,7 +36,13 @@ export default async function RegistrosPage({ searchParams }: { searchParams: Pr
 
       <FiltrosFecha action="/planillas/registros" desde={desde} hasta={hasta} />
 
-      <RegistrosPlanillas registros={registros} abribles={abribles} estaciones={visibles} />
+      <RegistrosPlanillas
+        registros={registros}
+        abribles={abribles}
+        estacionesAbribles={sesion.estaciones.map((e) => e.id)}
+        todas={puede(sesion, PERMISOS.PLANILLAS_CONFIGURAR)}
+        estaciones={visibles}
+      />
     </main>
   );
 }

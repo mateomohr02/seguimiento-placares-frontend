@@ -35,12 +35,37 @@ export interface VersionPlanilla {
   reemplazada_en: string;
 }
 
-export interface Planilla {
+/** Estación de trabajo (termolaminado1, mecanizado1…) a la que pertenece una planilla. */
+export interface EstacionTrabajoRef {
   id: string;
+  nombre: string;
+}
+
+/** Operario elegido en una planilla. `usuario_id` es null en las planillas viejas (solo el nombre, como historia). */
+export interface OperarioPlanilla {
+  usuario_id: string | null;
+  nombre: string;
+  /** Ya figura en la planilla y no se puede quitar (salvo que `puede_cambiar_bloqueados`). */
+  bloqueado: boolean;
+}
+
+export interface OperarioDisponible {
+  usuario_id: string;
+  nombre: string;
+}
+
+export interface Planilla {
+  /** Una planilla que todavía no se guardó llega «virtual»: sin id (o id vacío). */
+  id: string | null;
   estacion: Estacion;
+  estacion_trabajo: EstacionTrabajoRef;
   fecha: string;
   estado: EstadoPlanilla;
-  operarios: string[];
+  operarios: OperarioPlanilla[];
+  /** Personas activas de la estación + las ya incluidas en la planilla. */
+  operarios_disponibles: OperarioDisponible[];
+  /** true para quien tiene `planillas.configurar`: puede cambiar también los operarios bloqueados. */
+  puede_cambiar_bloqueados: boolean;
   creado_por: string;
   modificado_por: string;
   creado_en: string;
@@ -52,13 +77,14 @@ export interface Planilla {
 
 export interface DatosVersion extends VersionPlanilla {
   planilla_id: string;
-  datos: { estado: EstadoPlanilla; operarios: string[]; filas: (Omit<FilaPlanilla, "fotos"> & { fotos: number; fotos_lista?: FotoFila[] })[] };
+  datos: { estado: EstadoPlanilla; operarios: (string | { nombre: string })[]; filas: (Omit<FilaPlanilla, "fotos"> & { fotos: number; fotos_lista?: FotoFila[] })[] };
 }
 
 export interface RegistroPlanilla {
   id: string;
   planilla_id: string;
   estacion: Estacion;
+  estacion_trabajo: EstacionTrabajoRef;
   fecha: string;
   estado: EstadoPlanilla;
   operarios: string[];
@@ -113,6 +139,7 @@ export interface Indicadores {
 export interface RegistroTraza {
   pedido_codigo: string;
   estacion: Estacion;
+  estacion_trabajo: EstacionTrabajoRef;
   fecha: string;
   hora_inicio: string | null;
   hora_fin: string | null;
@@ -131,29 +158,12 @@ export interface Trazabilidad extends Omit<ResumenPedido, "estaciones"> {
   registros: RegistroTraza[];
 }
 
-/** Operarios entre los que elige el usuario al completar sus planillas (los configura técnica). */
-export interface OperariosArea {
-  operarios: string[];
-  /** Operarios que se preseleccionan en una planilla nueva de cada estación asignada (los que quedaron elegidos la última vez; sin historial, todos). */
-  predeterminados: Partial<Record<Estacion, string[]>>;
-}
-
-/** Estado de producción del catálogo (con cuántos usuarios lo tienen y cuántas marcas hizo). */
+/** Estado de producción del catálogo (con cuántas estaciones lo tienen y cuántas marcas hizo). */
 export interface EstadoProduccion {
   id: string;
   nombre: string;
   /** #rrggbb con el que se ve el estado en la planificación. */
   color: string | null;
-  usuarios: number;
+  estaciones: number;
   marcas: number;
-}
-
-/** Configuración de un usuario de fábrica: planillas que completa, estado que marca y operarios de su estación. */
-export interface AccesoUsuario {
-  id: string;
-  nombre: string;
-  rol: string;
-  estaciones: Estacion[];
-  estado_id: string | null;
-  operarios: string[];
 }
