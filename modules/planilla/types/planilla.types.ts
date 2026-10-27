@@ -147,13 +147,3 @@ export interface EstadoProduccion {
   usuarios: number;
   marcas: number;
 }
-
-/** Configuración de un usuario de fábrica: planillas que completa, estado que marca y operarios de su estación. */
-export interface AccesoUsuario {
-  id: string;
-  nombre: string;
-  rol: string;
-  estaciones: Estacion[];
-  estado_id: string | null;
-  operarios: string[];
-}
