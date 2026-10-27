@@ -1,3 +1,5 @@
+import type { Linea } from "@/lib/linea";
+
 export type PedidoEstado = "PENDIENTE" | "EN_PRODUCCION" | "FINALIZADO" | "ELIMINADO";
 
 export interface Pedido {
@@ -6,6 +8,7 @@ export interface Pedido {
   referencia: string;
   nombreComercial: string;
   estado: PedidoEstado;
+  lineas: Linea[];
   modulosCount: number;
 }
 

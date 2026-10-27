@@ -30,8 +30,51 @@ const COLOR_MATERIAL: Record<string, string> = {
   esfera2: "#b8bcc2",
   "esfera-gris": "#b8bcc2",
   brillonegro3: "#1a1a1a",
+  enci: "#3a3a3c", // marcador de encimera sin material declarado en la escena
+};
+// Los códigos de color se repiten entre catálogos con otra textura (83 códigos están en Placares y en Cocinas: ERDAT, EGM,
+// PBM, PG, PM… difieren), por eso las cocinas tienen su propia tabla: promedio de `3/Colores/<código>.jpg` de TeoWin
+// (melaminas F…, termolaminados P… como PMA/PG/PBM/PRG/PNS/PHG/PNM/BB, vidrios V… como VBR/VT/VGT, cantos y metales). Los
+// blancos puros se muestran como #f2f2f0 (igual que FBLA en Placares) para que no ardan con la luz ambiente. Se busca primero
+// por el catálogo de la pieza y, si no está, en la tabla general de arriba.
+const COLOR_MATERIAL_CAT: Record<string, Record<string, string>> = {
+  "3": {
+    AA: "#b3b3b2", AC: "#a0a0a3", B: "#f2f2f0", BB: "#fafcfb", BBLA: "#f2f2f0", BGG: "#4c5051", BR: "#ba9256",
+    CHA: "#726040", COB: "#c28058", CR: "#a9aaa7", E: "#c3c3c3", EBR: "#9c7852", EE: "#e6e7df", EGM: "#848683",
+    EGP: "#c1c0bc", EN: "#030408", ENH: "#5a3e3b", ENV: "#07080a", ERA: "#c49d96", ERDAT: "#866c58",
+    ERDMT: "#887663", ERTN: "#1f1613", FAM: "#cfcdc0", FBLA: "#f2f2f0", FBLAN: "#c2ad8f", FC: "#e5e6e0",
+    FCAJ: "#c2ad8f", FCAM: "#d0b69a", FCARAS: "#604f40", FEV: "#f2f2f0", FGC: "#c0bdb6", FGG: "#303030",
+    FGT: "#b1a79d", FJADE: "#9aab98", FLB: "#efedf0", FLT: "#6e6256", FMER: "#4c3c35", FN: "#050306",
+    FNM: "#866045", FNT: "#855d33", FOF: "#b58259", FPET: "#886c3e", FS: "#beb1a0", FSAF: "#64664e",
+    FSC: "#a98d70", FSG: "#cac4b8", FSN: "#938c85", FT: "#867666", FTER: "#875d44", FTU: "#022831",
+    FV: "#e3e3e5", GC: "#c1c1c1", GO: "#555555", MP: "#bdbdbc", MWEN: "#2e160d", NA: "#d3c4a7", NE: "#0b0a09",
+    NMC: "#2c2c2c", NN: "#000000", NO: "#343839", OX: "#86745b", PBB: "#e1e1e1", PBM: "#f2f2f0", PC: "#9b7b6e",
+    PG: "#4b4b4b", PHG: "#56615d", PM: "#9e775b", PMA: "#c3b6a6", PNM: "#191919", PNS: "#564939",
+    PRG: "#747869", PTR: "#663831", RBE: "#f2f2f0", RVEN: "#d4d2d0", SCAP: "#afa6a1", SGUA: "#866e47",
+    SPET: "#725c35", STER: "#6f5240", VAC: "#cccfd4", VB: "#f2f2f0", VBR: "#9c7852", VCH: "#3d2519",
+    VGO: "#232323", VGT: "#232323", VMB: "#6f452d", VMI: "#8d8e8c", VN: "#d3c4a7", VNE: "#050704",
+    VO: "#c3cfc9", VT: "#9ad9ea", VTE: "#bf671e", VTEO: "#bc7643", VV: "#826e67", L001: "#f2f2f0",
+    L043: "#aea9a3", L044: "#a4a39f", L046: "#575759", L047: "#000000", brillometal3: "#ababab",
+    horno1: "#57686b", "009-metal": "#585136",
+  },
+  // Encimeras (636): el código llega como "<636>BNO" (material por defecto de la escena, `hdrDataLin <636 EN;…>`).
+  "636": {
+    BNO: "#dddeda",
+    MACK: "#1e2126",
+    ICONIW: "#fcfbfa",
+    MIAMIW: "#f1f2f6",
+    GRPE: "#b6b2b2",
+    AZBE: "#82797e",
+    BIAVAG: "#e0dfdb",
+    ETDUSK: "#d2d2d4",
+    VK01: "#cdc6c1",
+  },
 };
 const COLOR_DEFECTO = "#d6d2c8";
+
+// Escenas guardadas con una versión vieja del intérprete (< 30) no traen el catálogo de las piezas que son del de su mueble
+// ni, a veces, el del mueble: solo en ese caso se supone Placares. El intérprete actual siempre lo declara.
+const CAT_DEFECTO = "4";
 const COLOR_PARED = "#d2d2d0";
 const COLOR_SUELO = "#d9d9d9"; // piso sin material: TeoWin lo muestra gris claro
 
@@ -45,8 +88,17 @@ const TILE_JUNTAS_MAX_MM = 600;
 
 const DURACION_MS = 550;
 
-function colorCaja(m: string, c: [number, number, number] | null): THREE.Color {
-  const hex = COLOR_MATERIAL[m];
+// "<636>BNO" = código BNO del catálogo 636 (el prefijo `<n>` solo vale si ese catálogo tiene tabla; si no, se ignora).
+const PREFIJO_CATALOGO = /^<(\d+)>(.+)$/;
+function colorMaterial(cat: string, m: string): string | undefined {
+  const p = PREFIJO_CATALOGO.exec(m);
+  const codigo = p ? p[2] : m;
+  const catalogo = p && COLOR_MATERIAL_CAT[p[1]] ? p[1] : cat;
+  return COLOR_MATERIAL_CAT[catalogo]?.[codigo] ?? COLOR_MATERIAL[codigo] ?? COLOR_MATERIAL[m];
+}
+
+function colorCaja(cat: string, m: string, c: [number, number, number] | null): THREE.Color {
+  const hex = colorMaterial(cat, m);
   if (hex) return new THREE.Color(hex);
   if (c && !(c[0] === 1 && c[1] === 1 && c[2] === 1)) return new THREE.Color(c[0], c[1], c[2]);
   return new THREE.Color(COLOR_DEFECTO);
@@ -57,8 +109,12 @@ export const urlTextura = (clave: string) => {
   return `/texturas-3d/${clave.slice(0, i)}/${encodeURIComponent(clave.slice(i + 1))}`;
 };
 
-// UV de una caja en milímetros: cada cara repite la textura según su medida real.
-function escalarUvCaja(g: THREE.BoxGeometry, l: number, h: number, p: number, tile: number) {
+// UV de una caja en milímetros: cada cara repite la textura según su medida real (1200 mm por baldosa en ambos ejes).
+// Las imágenes de los tableros tienen la veta a lo largo del eje v. `veta` (eje local de la caja: 0 = L, 1 = H, 2 = P) dice por dónde
+// debe correr la veta de la pieza (marca orient/texV de TeoWin): en las caras cuyo eje u es ese eje se intercambian u y v (la veta pasa a
+// correr por u); en las que ya lo tienen en v, o no contienen ese eje, queda igual. Sin `veta` el resultado es el de siempre.
+// Caras de BoxGeometry: +x, -x (u = P, v = H), +y, -y (u = L, v = P), +z, -z (u = L, v = H).
+function escalarUvCaja(g: THREE.BoxGeometry, l: number, h: number, p: number, tile: number, veta?: 0 | 1 | 2) {
   const uv = g.attributes.uv as THREE.BufferAttribute;
   const dims = [
     [p, h],
@@ -68,10 +124,15 @@ function escalarUvCaja(g: THREE.BoxGeometry, l: number, h: number, p: number, ti
     [l, h],
     [l, h],
   ];
+  const ejeU = [2, 2, 0, 0, 0, 0];
   for (let f = 0; f < 6; f++) {
+    const girar = veta !== undefined && ejeU[f] === veta;
     for (let k = 0; k < 4; k++) {
       const i = f * 4 + k;
-      uv.setXY(i, (uv.getX(i) * dims[f][0]) / tile, (uv.getY(i) * dims[f][1]) / tile);
+      const u = (uv.getX(i) * dims[f][0]) / tile;
+      const v = (uv.getY(i) * dims[f][1]) / tile;
+      if (girar) uv.setXY(i, v, u);
+      else uv.setXY(i, u, v);
     }
   }
   uv.needsUpdate = true;
@@ -97,6 +158,21 @@ function texturaConJuntas(tex: THREE.Texture, lista: THREE.Texture[]): THREE.Tex
   return t;
 }
 
+/**
+ * ¿Es un módulo de producción (se lista y se puede aislar)? Cocinas (catálogo 3), placares (4) y los catálogos comerciales
+ * (6 dígitos, ej. 100242). El resto es decoración y equipamiento de la escena (lámparas 652/507, electrodomésticos 637,
+ * ventanas y puertas de paso, encimeras 636…): se siguen dibujando en la escena completa, pero no son un mueble a fabricar.
+ * Se decide por el catálogo del módulo, así vale también para las escenas guardadas con versiones viejas del intérprete.
+ */
+function esModuloDeProduccion(m: { catalogo: string }): boolean {
+  return m.catalogo === "3" || m.catalogo === "4" || /^\d{6,}$/.test(m.catalogo);
+}
+
+/** Pieza de la mesada: contorno o losa del catálogo 636, o trozo reconstruido (`<636>MAT` / `enci`). */
+function esMesada(p: { k?: string; m: string }): boolean {
+  return p.k === "636" || p.m === "enci" || p.m.startsWith("<636>");
+}
+
 type MatVisor = THREE.MeshLambertMaterial | THREE.MeshBasicMaterial | THREE.MeshMatcapMaterial;
 
 interface Animable {
@@ -114,6 +190,8 @@ function construirGrupos(escena: Escena3D) {
   const modulos = new THREE.Group();
   const geoms: THREE.BufferGeometry[] = [];
   const mats: THREE.Material[] = [];
+  /** Piezas de la mesada (se pueden ocultar). */
+  const mesadas: THREE.Object3D[] = [];
   /** Materiales que esperan una textura, por clave "catálogo/código". */
   const porClave = new Map<string, MatVisor[]>();
   const cacheMat = new Map<string, MatVisor>();
@@ -161,16 +239,17 @@ function construirGrupos(escena: Escena3D) {
     const g = new THREE.BoxGeometry(c.s[0], c.s[1], c.s[2]);
     g.translate(c.s[0] / 2, c.s[1] / 2, c.s[2] / 2);
     // Una foto de paisaje (PSJ) cubre la cara una sola vez; el resto repite la textura por medida real.
-    if (c.p !== 1) escalarUvCaja(g, c.s[0], c.s[1], c.s[2], TILE_MUEBLE_MM);
+    if (c.p !== 1) escalarUvCaja(g, c.s[0], c.s[1], c.s[2], TILE_MUEBLE_MM, c.v);
     geoms.push(g);
-    const cat = c.k ?? catalogoDe.get(c.mod ?? -1) ?? "4";
-    const mat = matDe(c.m ? `${cat}/${c.m}` : null, colorCaja(c.m, c.c), false, false, c.o ?? 1, c.p === 1);
+    const cat = c.k ?? catalogoDe.get(c.mod ?? -1) ?? CAT_DEFECTO;
+    const mat = matDe(c.m ? `${cat}/${c.m}` : null, colorCaja(cat, c.m, c.c), false, false, c.o ?? 1, c.p === 1);
     const mesh = new THREE.Mesh(g, mat);
     if (c.a !== undefined) mesh.userData.anim = c.a;
     const borde = new THREE.LineSegments(new THREE.EdgesGeometry(g), matBorde);
     geoms.push(borde.geometry);
     const obj = new THREE.Group();
     obj.add(mesh, borde);
+    if (esMesada(c)) mesadas.push(obj);
     const r = c.r;
     obj.matrixAutoUpdate = false;
     obj.matrix.set(r[0], r[1], r[2], c.t[0], r[3], r[4], r[5], c.t[1], r[6], r[7], r[8], c.t[2], 0, 0, 0, 1);
@@ -203,12 +282,13 @@ function construirGrupos(escena: Escena3D) {
     if (!liso) g.dispose();
     geo.computeVertexNormals();
     geoms.push(geo);
-    const cat = mm.k ?? catalogoDe.get(mm.mod ?? -1) ?? "4";
-    const mat = matDe(mm.m ? `${cat}/${mm.m}` : null, colorCaja(mm.m, mm.c), true, false, mm.o ?? 1, mm.e === 1);
+    const cat = mm.k ?? catalogoDe.get(mm.mod ?? -1) ?? CAT_DEFECTO;
+    const mat = matDe(mm.m ? `${cat}/${mm.m}` : null, colorCaja(cat, mm.m, mm.c), true, false, mm.o ?? 1, mm.e === 1);
     const mesh = new THREE.Mesh(geo, mat);
     if (mm.a !== undefined) mesh.userData.anim = mm.a;
     const obj = new THREE.Group();
     obj.add(mesh);
+    if (esMesada(mm)) mesadas.push(obj);
     const r = mm.r;
     obj.matrixAutoUpdate = false;
     obj.matrix.set(r[0], r[1], r[2], mm.t[0], r[3], r[4], r[5], mm.t[1], r[6], r[7], r[8], mm.t[2], 0, 0, 0, 1);
@@ -307,14 +387,15 @@ function construirGrupos(escena: Escena3D) {
     geoms.push(g);
     pared.add(new THREE.Mesh(g, matDe(w.m ? `641/${w.m}` : null, new THREE.Color(COLOR_PARED), w.d === 1, !!w.m && !!w.t && w.t[0] <= TILE_JUNTAS_MAX_MM)));
   }
-  return { porModulo, modulos, entorno, pared, anims, porClave, geoms, mats };
+  return { porModulo, modulos, entorno, pared, anims, porClave, geoms, mats, mesadas };
 }
 
 type Grupos = ReturnType<typeof construirGrupos>;
 
 // Qué se ve: un módulo aislado, o la escena completa (con o sin paredes).
-function aplicarVista(grupos: Grupos, seleccion: number | null, paredes: boolean) {
+function aplicarVista(grupos: Grupos, seleccion: number | null, paredes: boolean, mesadas: boolean) {
   for (const [id, g] of grupos.porModulo) g.visible = seleccion === null || id === seleccion;
+  for (const o of grupos.mesadas) o.visible = mesadas;
   grupos.pared.visible = paredes && seleccion === null;
   grupos.entorno.visible = seleccion === null;
 }
@@ -382,6 +463,8 @@ export function EscenaVisor({
   const contenedor = useRef<HTMLDivElement>(null);
   const [seleccion, setSeleccion] = useState<number | null>(null); // idEscena aislado
   const [paredes, setParedes] = useState(true);
+  // Destildada por defecto: la mesada es decorativa y TeoWin no la muestra en varias escenas (el archivo no dice cuándo); se tilda para verla.
+  const [mesadas, setMesadas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const api = useRef<Api | null>(null);
   // Hoja de puerta abierta: 0 = todas cerradas, n = se abrió la hoja n.
@@ -397,6 +480,9 @@ export function EscenaVisor({
     () => escena.animaciones.flatMap((a, i) => (a.tipo === "giro" ? [i] : [])),
     [escena.animaciones],
   );
+  const hayMesadas = useMemo(() => escena.cajas.some(esMesada) || (escena.mallas ?? []).some(esMesada), [escena]);
+  // Solo los módulos de producción (cocinas, placares): lámparas, electrodomésticos, ventanas… se dibujan pero no se listan.
+  const modulosListados = useMemo(() => escena.modulos.filter(esModuloDeProduccion), [escena.modulos]);
   const cajones = useMemo(
     () => escena.animaciones.flatMap((a, i) => (a.tipo === "cajon" ? [i] : [])),
     [escena.animaciones],
@@ -580,9 +666,9 @@ export function EscenaVisor({
   useEffect(() => {
     const actual = api.current;
     if (!actual) return;
-    aplicarVista(actual.grupos, seleccion, paredes);
+    aplicarVista(actual.grupos, seleccion, paredes, mesadas);
     actual.encuadrar(seleccion);
-  }, [seleccion, paredes, escena]);
+  }, [seleccion, paredes, mesadas, escena]);
 
   // Botón de puertas: cierra → abre la hoja 1 → abre la hoja 2 → … → cierra.
   function ciclarPuertas() {
@@ -655,6 +741,12 @@ export function EscenaVisor({
           />
           Paredes
         </label>
+        {hayMesadas && (
+          <label className="flex h-11 items-center gap-2 text-sm">
+            <input type="checkbox" checked={mesadas} onChange={(e) => setMesadas(e.target.checked)} className="size-5" />
+            Mesada
+          </label>
+        )}
         <button
           type="button"
           onClick={() => api.current?.encuadrar(seleccion, true)}
@@ -687,7 +779,7 @@ export function EscenaVisor({
           >
             Escena completa
           </button>
-          {escena.modulos.map((m) => (
+          {modulosListados.map((m) => (
             <button
               key={m.idEscena}
               type="button"

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LineasBadges } from "@/components/linea-badge";
 import { EstadoBadge } from "@/components/estado-badge";
 import {
   Table,
@@ -21,6 +22,7 @@ export function PedidosTable({ pedidos }: { pedidos: Pedido[] }) {
         <TableRow>
           <TableHead>N° pedido</TableHead>
           <TableHead>Cliente</TableHead>
+          <TableHead>Modulación</TableHead>
           <TableHead>Módulos</TableHead>
           <TableHead>Estado</TableHead>
         </TableRow>
@@ -37,6 +39,9 @@ export function PedidosTable({ pedidos }: { pedidos: Pedido[] }) {
               <Link href={`/pedidos/${pedido.id}`} className="hover:underline">
                 {pedido.referencia}
               </Link>
+            </TableCell>
+            <TableCell>
+              <LineasBadges lineas={pedido.lineas} />
             </TableCell>
             <TableCell>{pedido.modulosCount}</TableCell>
             <TableCell>

@@ -136,6 +136,14 @@ Si necesitás usar la cámara (Vista 5) desde una **tablet**, hace falta un paso
 
 ---
 
+## Placares y Cocinas (rama `feature/extension-cocinas`)
+
+La app sirve a **placares y cocinas**. Cada orden, pedido y módulo muestra su **línea** con un badge (`components/linea-badge.tsx`; una orden o pedido mixto muestra los dos) y el listado de órdenes tiene el filtro **Todas / Placares / Cocinas** (`?linea=`). La documentación adicional del pedido depende de `pedido.lineas` (`tiposAdicionalesDe` en `modules/documento-pedido/types/documento-pedido.types.ts`): placares ofrece escandallo, herrajes y accesorios; cocinas, solo herrajes y accesorios (no hay escandallo de cocinas); un pedido mixto ve ambos. El flujo de escaneo y de piezas es el mismo para las dos líneas. El visor 3D usa colores por catálogo (`COLOR_MATERIAL_CAT`), lista en el panel «Módulos» solo los módulos de producción (catálogos 3, 4 y comerciales de 6 dígitos; lámparas, electrodomésticos, decoración y puertas de paso se dibujan en la escena completa pero no se listan ni se aíslan) y tiene la casilla **«Mesada»** para ocultar la encimera (aparece solo si la escena tiene mesada). En el detalle de la orden, la columna de la tabla de pedidos se llama **«Modulación»** y muestra un ícono de horno (cocinas) o de armario (placares), dibujados en `components/iconos-linea.tsx` porque lucide-react no los trae. Detalle en `diseño.md` §16.
+
+## Partida del módulo
+
+En el detalle de un pedido, **mantener presionado (~500 ms) un módulo** abre un popup con su «Partida» de TeoWin (capítulo, referencia, descripción, L/H/P, unidades y, si el usuario es de gestión —admin, gerencia, técnica—, variantes, precio y total) sobre un fondo blureado; se cierra tocando fuera de la card, con Escape o con el botón de cerrar. Un toque corto sigue entrando al despiece, y el gesto se cancela si el dedo se mueve más de ~10 px. Con teclado: Shift+Enter o «I» sobre la fila. Un módulo sin partida avisa «Sin partida cargada». En `/modulos/[id]` la partida es el encabezado sobre el despiece. Los usuarios de fábrica nunca reciben los importes y la pantalla no muestra esas filas. Componentes: `modules/modulo/components/partida-card.tsx` (compartida), `partida-popup.tsx`, `partida-encabezado.tsx`; hook `lib/use-long-press.ts`; formato es-AR en `lib/numeros.ts`. Detalle en `diseño.md` §16.6.
+
 ## Flujo de ramas (git)
 
 Detalle en `diseño.md` §15 (vale para este repo y el otro).
@@ -411,6 +419,7 @@ Cada pedido puede tener una o más **escenas 3D** (el archivo `.3d` que TeoWin g
 - **Puertas con bisagra**: el botón **Abrir puertas batientes** las abre todas (o tocar una hoja). El lado de la bisagra se calcula respecto del mueble (la hoja derecha de un mueble de cocina está girada 180°). Los tiradores marcados como invisibles en TeoWin no se dibujan. Las puertas de paso de vidrio se ven translúcidas.
 - **Puertas de paso**: la pared tiene un hueco donde va la puerta (se ve el vidrio y su marco). Las paredes se dibujan solo de un lado: desde afuera de la sala no se ven.
 - **Vista frontal**: botón que mira la escena de frente y a la altura de la vista (como el editor de TeoWin); sirve para comparar con una captura. Se ven también cortinas, barandas, maderas, tubos y vidrios (mallas); la foto de paisaje se ve sin sombras.
+- **Mesada**: casilla que muestra u oculta la mesada y las losas de encimera; **arranca destildada** (es decorativa y TeoWin no siempre la muestra). Solo aparece si la escena tiene mesada.
 - **Tiras de canto negras** (marcos de puertas): se dibujan como una caja del tamaño de la tira.
 - **Alcance**: muebles, paredes, pisos, zócalos, encimeras, ventanas y puertas de paso (con hueco en la pared), griferías, cortinas y la decoración de los catálogos de TeoWin. No se dibujan los herrajes (bisagras, manillones) ni el marco de cada hoja de una puerta de paso. Los catálogos de decoración y equipamiento no se animan. Detalle: `diseño.md` §13.
 - Para programar: el visor es `modules/escena-pedido/components/escena-visor.tsx` (three.js, sin dependencias de la lógica de negocio); recibe la geometría ya interpretada (`Escena3D`). Las texturas se piden por `/texturas-3d/<catálogo>/<código>`; el UV es por medida real (`TILE_*_MM`). Las animaciones son grupos de three.js (`Animable`) que `avanzarAnimaciones` desplaza; los colores de respaldo están en `COLOR_MATERIAL`.
