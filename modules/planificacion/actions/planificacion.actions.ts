@@ -31,7 +31,7 @@ export async function eliminarItemAction(id: string): Promise<PlanificacionResul
   return ejecutar(() => apiFetch(`/planificacion/items/${id}`, { method: "DELETE" }), "Error inesperado al quitar la fila.");
 }
 
-/** Marca o desmarca el estado de producción que técnica le asignó al usuario. */
-export async function marcarEstadoAction(id: string, marcado: boolean): Promise<PlanificacionResult> {
-  return ejecutar(() => apiFetch(`/planificacion/items/${id}/marca`, { method: "PUT", body: { marcado } }), "Error inesperado al marcar el estado.");
+/** Marca o desmarca un estado de producción de las estaciones de trabajo del usuario (`estadoId` es obligatorio con más de uno). */
+export async function marcarEstadoAction(id: string, marcado: boolean, estadoId: string): Promise<PlanificacionResult> {
+  return ejecutar(() => apiFetch(`/planificacion/items/${id}/marca`, { method: "PUT", body: { marcado, estado_id: estadoId } }), "Error inesperado al marcar el estado.");
 }

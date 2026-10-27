@@ -12,8 +12,8 @@ const lunesDe = (iso: string) => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * DIA_MS).toISOString().slice(0, 10);
 };
 
-// Planificación semanal de Termolaminado (pedidos y reclamos) que carga técnica; cada usuario con un estado de
-// producción asignado lo marca en los pedidos que terminó (diseño.md §14.4).
+// Planificación semanal de Termolaminado (pedidos y reclamos) que carga técnica; cada operario de una estación de trabajo con estado de
+// producción lo marca (si tiene varios, elige cuál) en los pedidos que terminó (diseño.md §14.4).
 export default async function PlanificacionPage({ searchParams }: { searchParams: Promise<{ semana?: string }> }) {
   const sesion = await requireSesion();
   if (!puede(sesion, PERMISOS.DOCUMENTACION_VER)) notFound();

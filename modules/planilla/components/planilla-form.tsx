@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2Icon, CheckIcon, ClockIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { CheckCircle2Icon, CheckIcon, ClockIcon, LockIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingDots } from "@/components/loading-dots";
-import { ETIQUETA_ESTACION, fechaCorta, slugEstacion } from "../lib/estaciones";
-import type { Estacion, EstadoPlanilla, FotoFila, Planilla } from "../types/planilla.types";
+import { ETIQUETA_ESTACION, fechaCorta, rutaPlanilla } from "../lib/estaciones";
+import type { Estacion, EstadoPlanilla, FotoFila, OperarioDisponible, OperarioPlanilla, Planilla } from "../types/planilla.types";
 import { FotosFila, subirFoto, type FotoPendiente } from "./fotos-fila";
 
 // Formulario de una planilla de producción (Lijado, Encolado o PVC) de un día. Mientras
@@ -78,6 +78,7 @@ const desdeServidor = (p: Planilla): FilaForm[] =>
 
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
 
+// `operarios` son los ids de usuario de las personas elegidas (los nombres viejos sin usuario no se mandan: el servidor los conserva).
 const hacerBody = (estado: EstadoPlanilla, operarios: string[], filas: FilaForm[]) => ({
   estado,
   operarios,
@@ -110,6 +111,9 @@ const ahora = () => {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
+/** Ids de las personas elegidas (los nombres viejos sin usuario no se mandan). */
+const idsDe = (operarios: OperarioPlanilla[]) => operarios.flatMap((o) => (o.usuario_id ? [o.usuario_id] : []));
+
 const fechaHora = new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" });
 
 interface Sugerencia {
@@ -118,30 +122,31 @@ interface Sugerencia {
 }
 
 export function PlanillaForm({
-  estacion,
+  tipo: estacion,
+  estacionTrabajoId,
   fecha,
   inicial,
-  operariosConfigurados,
-  operariosPredeterminados,
   colores,
 }: {
-  estacion: Estacion;
+  /** Tipo de planilla: Lijado, Encolado o PVC. */
+  tipo: Estacion;
+  estacionTrabajoId: string;
   fecha: string;
-  inicial: Planilla | null;
-  operariosConfigurados: string[];
-  /** Operarios que se marcan al abrir una planilla nueva (los que se dejaron elegidos la última vez; sin historial, todos). */
-  operariosPredeterminados: string[];
+  /** La planilla del día; si todavía no existe llega «virtual» con la preselección de operarios que calcula el servidor. */
+  inicial: Planilla;
   colores: string[];
 }) {
   const router = useRouter();
-  const [filas, setFilas] = useState<FilaForm[]>(() => (inicial && inicial.filas.length > 0 ? desdeServidor(inicial) : [vacia()]));
-  const [estado, setEstado] = useState<EstadoPlanilla>(inicial?.estado ?? "BORRADOR");
-  // Los operarios se eligen a mano para cada planilla (de la lista que configura técnica).
-  const [operarios, setOperarios] = useState<string[]>(inicial?.operarios ?? operariosPredeterminados);
-  const [actualizadaEn, setActualizadaEn] = useState<string | null>(inicial?.actualizado_en ?? null);
-  const [modificadaPor, setModificadaPor] = useState<string | null>(inicial?.modificado_por ?? null);
-  const [versiones, setVersiones] = useState(inicial?.versiones.length ?? 0);
-  const [planillaId, setPlanillaId] = useState<string | null>(inicial?.id ?? null);
+  const [filas, setFilas] = useState<FilaForm[]>(() => (inicial.filas.length > 0 ? desdeServidor(inicial) : [vacia()]));
+  const [estado, setEstado] = useState<EstadoPlanilla>(inicial.estado ?? "BORRADOR");
+  // Los operarios son personas de la estación de trabajo. Vienen preseleccionados y con el bloqueo ya calculado por el servidor.
+  const [operarios, setOperarios] = useState<OperarioPlanilla[]>(inicial.operarios);
+  const [disponibles, setDisponibles] = useState<OperarioDisponible[]>(inicial.operarios_disponibles);
+  const [puedeCambiarBloqueados, setPuedeCambiarBloqueados] = useState(inicial.puede_cambiar_bloqueados);
+  const [actualizadaEn, setActualizadaEn] = useState<string | null>(inicial.id ? inicial.actualizado_en : null);
+  const [modificadaPor, setModificadaPor] = useState<string | null>(inicial.id ? inicial.modificado_por : null);
+  const [versiones, setVersiones] = useState(inicial.versiones?.length ?? 0);
+  const [planillaId, setPlanillaId] = useState<string | null>(inicial.id || null);
   const [sucio, setSucio] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -189,10 +194,10 @@ export function PlanillaForm({
         const enviadas = filasRef.current;
         setGuardando(true);
         try {
-          const res = await fetch(`/planillas-api/dia/${slugEstacion(estacion)}/${fecha}`, {
+          const res = await fetch(`/planillas-api/dia/${encodeURIComponent(estacionTrabajoId)}/${estacion}/${fecha}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(hacerBody(destino, operariosRef.current, enviadas)),
+            body: JSON.stringify(hacerBody(destino, idsDe(operariosRef.current), enviadas)),
           });
           const body = (await res.json().catch(() => null)) as { data?: Planilla; message?: string } | null;
           if (!res.ok || !body?.data) {
@@ -205,7 +210,10 @@ export function PlanillaForm({
           const idPorKey = new Map(enviadas.map((f, i) => [f.key, p.filas[i]?.id]));
           setFilas((prev) => prev.map((f) => (f.id ? f : { ...f, id: idPorKey.get(f.key) })));
           setEstado(p.estado);
+          // El servidor recalcula el bloqueo (quien ya figura en una planilla empezada queda bloqueado) y la lista de personas.
           if (cambiosRef.current === vistos) setOperarios(p.operarios);
+          setDisponibles(p.operarios_disponibles);
+          setPuedeCambiarBloqueados(p.puede_cambiar_bloqueados);
           setActualizadaEn(p.actualizado_en);
           setModificadaPor(p.modificado_por);
           setVersiones(p.versiones.length);
@@ -225,7 +233,7 @@ export function PlanillaForm({
       cola.current = tarea;
       return tarea;
     },
-    [estacion, fecha, subirPendientes],
+    [estacion, estacionTrabajoId, fecha, subirPendientes],
   );
 
   // Guardado automático del borrador.
@@ -249,10 +257,17 @@ export function PlanillaForm({
     setFilas(fn);
   }, []);
 
-  function alternarOperario(nombre: string) {
+  function alternarOperario(o: OperarioDisponible) {
+    const actual = operariosRef.current.find((x) => x.usuario_id === o.usuario_id);
+    // Un operario bloqueado no se puede quitar (salvo técnica/admin al corregir).
+    if (actual?.bloqueado && !puedeCambiarBloqueados) return;
     cambiosRef.current++;
     setSucio(true);
-    setOperarios((prev) => (prev.includes(nombre) ? prev.filter((n) => n !== nombre) : [...prev, nombre]));
+    setOperarios((prev) =>
+      prev.some((x) => x.usuario_id === o.usuario_id)
+        ? prev.filter((x) => x.usuario_id !== o.usuario_id)
+        : [...prev, { usuario_id: o.usuario_id, nombre: o.nombre, bloqueado: false }],
+    );
   }
 
   function setCampo(key: string, campo: CampoTexto, valor: string) {
@@ -301,7 +316,7 @@ export function PlanillaForm({
         return;
       }
     }
-    router.push(`/planillas/${slugEstacion(estacion)}?fecha=${nueva}`);
+    router.push(rutaPlanilla(estacion, estacionTrabajoId, nueva));
   }
 
   // Las fotos de un ítem nuevo esperan en el equipo y se suben solas cuando el ítem se guarda (borrador automático o botón).
@@ -324,8 +339,11 @@ export function PlanillaForm({
     return s + (Number.isFinite(n) ? n : 0);
   }, 0);
   const guardada = estado === "GUARDADA";
-  // La lista del área más los ya elegidos (por si técnica los sacó de la lista después).
-  const operariosDisponibles = [...operariosConfigurados, ...operarios.filter((n) => !operariosConfigurados.includes(n))];
+  // Los nombres viejos sin usuario (planillas anteriores a esta función) quedan como historia: se ven, no se tocan.
+  const historicos = operarios.filter((o) => o.usuario_id === null);
+  const bloqueadoPorId = new Map(operarios.filter((o) => o.usuario_id !== null).map((o) => [o.usuario_id, o.bloqueado] as const));
+  const hayBloqueados = operarios.some((o) => o.bloqueado);
+  const sinPersonas = disponibles.length === 0 && historicos.length === 0;
 
   return (
     <div className="flex flex-col gap-5 lg:gap-3">
@@ -351,30 +369,53 @@ export function PlanillaForm({
           <span id="planilla-operarios" className="font-medium">
             Operarios
           </span>
-          {operariosDisponibles.length === 0 ? (
-            <span className="text-muted-foreground">Técnica todavía no configuró los operarios del área.</span>
+          {sinPersonas ? (
+            <span className="text-muted-foreground">
+              La estación «{inicial.estacion_trabajo.nombre}» todavía no tiene operarios. Pedile a técnica que asigne personas a la estación (Termolaminado &gt; Configurar).
+            </span>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {operariosDisponibles.map((n) => {
-                const marcado = operarios.includes(n);
-                return (
-                  <button
-                    key={n}
-                    type="button"
-                    role="checkbox"
-                    aria-checked={marcado}
-                    onClick={() => alternarOperario(n)}
-                    className={`inline-flex h-11 items-center gap-1.5 rounded-full border px-5 text-base font-medium transition lg:h-9 lg:px-4 lg:text-sm active:scale-[0.98] ${
-                      marcado ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
-                    }`}
+            <>
+              <div className="flex flex-wrap gap-2">
+                {disponibles.map((o) => {
+                  const marcado = bloqueadoPorId.has(o.usuario_id);
+                  const fijo = marcado && bloqueadoPorId.get(o.usuario_id) === true && !puedeCambiarBloqueados;
+                  return (
+                    <button
+                      key={o.usuario_id}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={marcado}
+                      aria-disabled={fijo || undefined}
+                      title={fijo ? "Ya figura en esta planilla: no se puede quitar" : undefined}
+                      onClick={() => alternarOperario(o)}
+                      className={`inline-flex h-11 items-center gap-1.5 rounded-full border px-5 text-base font-medium transition lg:h-9 lg:px-4 lg:text-sm ${
+                        marcado ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
+                      } ${fijo ? "cursor-not-allowed opacity-90" : "active:scale-[0.98]"}`}
+                    >
+                      {fijo ? <LockIcon className="size-4" aria-hidden /> : marcado && <CheckIcon className="size-4" aria-hidden />} {o.nombre}
+                      {fijo && <span className="sr-only"> (bloqueado: ya figura en la planilla)</span>}
+                    </button>
+                  );
+                })}
+                {historicos.map((o) => (
+                  <span
+                    key={`h-${o.nombre}`}
+                    title="Nombre de una planilla anterior: queda como historia"
+                    className="inline-flex h-11 items-center gap-1.5 rounded-full border border-primary bg-primary px-5 text-base font-medium text-primary-foreground opacity-90 lg:h-9 lg:px-4 lg:text-sm"
                   >
-                    {marcado && <CheckIcon className="size-4" />} {n}
-                  </button>
-                );
-              })}
-            </div>
+                    <LockIcon className="size-4" aria-hidden /> {o.nombre}
+                  </span>
+                ))}
+              </div>
+              {hayBloqueados && !puedeCambiarBloqueados && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <LockIcon className="size-3" aria-hidden /> Los operarios con candado ya figuran en la planilla y no se pueden quitar.
+                </span>
+              )}
+              {puedeCambiarBloqueados && <span className="text-xs text-muted-foreground">Como técnica podés cambiar todos los operarios, también los bloqueados.</span>}
+            </>
           )}
-          <span className="text-xs text-muted-foreground lg:hidden">Tocá los operarios que trabajaron en esta planilla.</span>
+          {!sinPersonas && <span className="text-xs text-muted-foreground lg:hidden">Tocá los operarios que trabajaron en esta planilla.</span>}
         </div>
         <div className="col-start-2 row-start-1 flex flex-col items-end gap-1 text-right text-sm lg:col-start-3 lg:gap-0.5">
           <Badge variant={guardada ? "default" : "secondary"}>{guardada ? "Guardada" : "Borrador"}</Badge>

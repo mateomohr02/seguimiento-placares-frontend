@@ -11,7 +11,7 @@ import { NavLinks, type NavGrupo } from "@/components/nav-links";
 function gruposDe(sesion: Sesion): NavGrupo[] {
   const grupos: NavGrupo[] = [{ titulo: null, links: [{ href: "/", label: "Órdenes", exacto: true }] }];
 
-  // Solo las planillas de las estaciones de trabajo del usuario (en el orden del proceso).
+  // Solo los tipos de planilla de las estaciones de trabajo del usuario (en el orden del proceso); si está en varias estaciones con el mismo tipo, elige en cuál al entrar. Técnica y admin ven los tres.
   const planillas = [
     { href: "/planillas/lijado", label: "Lijado", estacion: "LIJADO" },
     { href: "/planillas/encolado", label: "Encolado", estacion: "ENCOLADO" },

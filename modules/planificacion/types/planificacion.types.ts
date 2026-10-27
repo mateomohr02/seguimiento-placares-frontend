@@ -45,8 +45,8 @@ export interface SemanaPlanificacion {
   semana_inicio: string;
   semanas: string[];
   estados: EstadoBasico[];
-  /** El estado de producción que técnica le asignó al usuario (null = no puede marcar). */
-  mi_estado: EstadoBasico | null;
+  /** Estados de producción que el usuario puede marcar: los de sus estaciones de trabajo (vacío = no puede marcar). */
+  mis_estados: EstadoBasico[];
   items: ItemPlanificacion[];
 }
 

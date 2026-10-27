@@ -44,9 +44,20 @@ export const nombreCompleto = (p: { nombre: string; apellido?: string | null }) 
 
 export const puede = (sesion: Sesion, permiso: Permiso) => sesion.permisos.includes(permiso);
 
-/** ¿Puede completar ese tipo de planilla? Exige el permiso y que alguna de sus estaciones la tenga. */
-export const puedeCompletarPlanilla = (sesion: Sesion, estacion: string) =>
-  puede(sesion, PERMISOS.PLANILLAS_COMPLETAR) && sesion.planillas.includes(estacion);
+/**
+ * ¿Puede completar ese tipo de planilla (LIJADO, ENCOLADO, PVC)? Exige el permiso y que alguna de sus estaciones la tenga;
+ * quien tiene `planillas.configurar` (técnica, admin) puede abrir y corregir las de cualquier estación.
+ */
+export const puedeCompletarPlanilla = (sesion: Sesion, tipo: string) =>
+  puede(sesion, PERMISOS.PLANILLAS_COMPLETAR) && (sesion.planillas.includes(tipo) || puede(sesion, PERMISOS.PLANILLAS_CONFIGURAR));
+
+/** Estaciones de trabajo del usuario que tienen ese tipo de planilla (las que puede elegir al completarla). */
+export const estacionesConPlanilla = (sesion: Sesion, tipo: string) => sesion.estaciones.filter((e) => e.planillas.includes(tipo));
+
+/** ¿Puede abrir la planilla `tipo` de esa estación de trabajo en particular? */
+export const puedeAbrirPlanillaDe = (sesion: Sesion, tipo: string, estacionTrabajoId: string) =>
+  puede(sesion, PERMISOS.PLANILLAS_COMPLETAR) &&
+  (puede(sesion, PERMISOS.PLANILLAS_CONFIGURAR) || estacionesConPlanilla(sesion, tipo).some((e) => e.id === estacionTrabajoId));
 
 const ESTACIONES_PLANILLA = ["LIJADO", "ENCOLADO", "PVC"];
 

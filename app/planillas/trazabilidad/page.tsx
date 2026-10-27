@@ -90,7 +90,8 @@ export default async function TrazabilidadPage({ searchParams }: { searchParams:
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha</TableHead>
-                  <TableHead>Estación</TableHead>
+                  <TableHead>Planilla</TableHead>
+                  <TableHead>Estación de trabajo</TableHead>
                   <TableHead>Inicio</TableHead>
                   <TableHead>Fin</TableHead>
                   <TableHead className="text-right">Piezas</TableHead>
@@ -103,7 +104,7 @@ export default async function TrazabilidadPage({ searchParams }: { searchParams:
               <TableBody>
                 {traza.registros.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
                       Ese pedido no figura en ninguna planilla.
                     </TableCell>
                   </TableRow>
@@ -112,6 +113,7 @@ export default async function TrazabilidadPage({ searchParams }: { searchParams:
                   <TableRow key={i}>
                     <TableCell>{fechaCorta(r.fecha)}</TableCell>
                     <TableCell>{ETIQUETA_ESTACION[r.estacion]}</TableCell>
+                    <TableCell className="whitespace-nowrap">{r.estacion_trabajo?.nombre ?? "—"}</TableCell>
                     <TableCell>{r.hora_inicio ?? "—"}</TableCell>
                     <TableCell>{r.hora_fin ?? "—"}</TableCell>
                     <TableCell className="text-right">{r.cantidad_piezas ?? "—"}</TableCell>
