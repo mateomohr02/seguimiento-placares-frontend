@@ -13,6 +13,7 @@ export async function proxyJson(path: string, init: { method: string; body?: str
       body: init.body,
       cache: "no-store",
     });
+    if (res.status === 204) return new Response(null, { status: 204 }); // sin cuerpo (ej. reordenar)
     const body = await res.json().catch(() => null);
     return Response.json(body ?? { message: "Respuesta inválida del servidor." }, { status: res.status });
   } catch {

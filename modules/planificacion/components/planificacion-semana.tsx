@@ -1,14 +1,20 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, MessageSquareIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmActionButton } from "@/components/confirm-action-button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FilaOrdenable, ListaOrdenable, useOrdenOptimista } from "@/components/filas-ordenables";
+import { enviarOrden } from "@/lib/api/enviar-orden";
 import { fechaCorta } from "@/modules/planilla/lib/estaciones";
 import { colorDe, textoSobre } from "../lib/colores";
 import { eliminarItemAction, marcarEstadoAction } from "../actions/planificacion.actions";
-import { ETIQUETA_TIPO, type ItemPlanificacion, type SemanaPlanificacion, type TipoPlanificacion } from "../types/planificacion.types";
+import { ETIQUETA_TIPO, type EstacionPlanificacion, type ItemPlanificacion, type SemanaPlanificacion, type TipoPlanificacion } from "../types/planificacion.types";
+import { BuscadorPedido } from "./buscador-pedido";
+import { FiltroCompromiso, SIN_FECHA, opcionesDeFecha } from "./filtro-compromiso";
 import { ItemDialog } from "./item-dialog";
 import { ObservacionesCelda } from "./observaciones-celda";
 
@@ -17,23 +23,37 @@ const mas = (iso: string, dias: number) => new Date(new Date(`${iso}T00:00:00Z`)
 const v = (x: string | null) => (x === null || x === "" ? "—" : x);
 const f = (x: string | null) => (x ? fechaCorta(x) : "—");
 const hora = new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" });
+const SELECT =
+  "h-11 rounded-lg border border-input bg-background px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm";
 
-// Estados marcados en una fila y, para quien está en estaciones con estado, un botón por cada estado que puede marcar o quitar.
+const href = (estacionId: string, semana?: string) => `/planificacion?estacion=${encodeURIComponent(estacionId)}${semana ? `&semana=${semana}` : ""}`;
+
+// Cliente y N° TW van al pedido; N° orden va a la orden.
+function LinkPedido({ item, children, className }: { item: ItemPlanificacion; children: React.ReactNode; className?: string }) {
+  if (!item.pedido_id) return <span className={className}>{children}</span>;
+  return (
+    <Link href={`/pedidos/${item.pedido_id}`} className={`hover:underline ${className ?? ""}`}>
+      {children}
+    </Link>
+  );
+}
+
+// Estados marcados en una fila (en una línea; quién y cuándo en el tooltip) y un botón por cada estado que el usuario puede marcar o quitar.
 function Estados({ item, data }: { item: ItemPlanificacion; data: SemanaPlanificacion }) {
   return (
-    <div className="flex flex-col items-start gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
       {item.marcas.map((m) => (
-        <div key={m.estado_id} className="flex flex-col items-start leading-tight">
-          <span
-            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap"
-            style={{ backgroundColor: colorDe(m.color), color: textoSobre(colorDe(m.color)) }}
-          >
-            <CheckIcon className="size-3.5" /> {m.estado}
+        <span
+          key={m.estado_id}
+          title={`${m.estado}: ${hora.format(new Date(m.marcado_en))} · ${m.marcado_por}`}
+          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap"
+          style={{ backgroundColor: colorDe(m.color), color: textoSobre(colorDe(m.color)) }}
+        >
+          <CheckIcon className="size-3.5" /> {m.estado}
+          <span className="font-normal opacity-80">
+            · {hora.format(new Date(m.marcado_en))} · {m.marcado_por}
           </span>
-          <span className="pt-0.5 pl-1 text-xs text-muted-foreground">
-            {hora.format(new Date(m.marcado_en))} · {m.marcado_por}
-          </span>
-        </div>
+        </span>
       ))}
       {data.mis_estados.map((mio) => {
         const marcadoPorMi = item.marcas.some((m) => m.estado_id === mio.id);
@@ -42,11 +62,12 @@ function Estados({ item, data }: { item: ItemPlanificacion; data: SemanaPlanific
           <ConfirmActionButton
             key={mio.id}
             variant={marcadoPorMi ? "outline" : "default"}
+            className="h-11 px-3"
             label={marcadoPorMi ? (varios ? `Quitar «${mio.nombre}»` : "Quitar marca") : `Marcar «${mio.nombre}»`}
             title={marcadoPorMi ? `¿Quitar «${mio.nombre}»?` : `¿Marcar «${mio.nombre}»?`}
             description={
               <>
-                {marcadoPorMi ? "Se quita la marca de" : "Se marca como"} «{mio.nombre}»: {item.n_tw || item.cliente}.
+                {marcadoPorMi ? "Se quita la marca de" : "Se marca como"} «{mio.nombre}»: {item.codigo_pedido}.
               </>
             }
             successMessage={marcadoPorMi ? "Marca quitada." : "Estado marcado."}
@@ -59,25 +80,55 @@ function Estados({ item, data }: { item: ItemPlanificacion; data: SemanaPlanific
   );
 }
 
-function Acciones({ item, semana }: { item: ItemPlanificacion; semana: string }) {
+// Observaciones en una línea (la de técnica, recortada) y un botón que abre el detalle con todas, el historial y el alta.
+function ObservacionesResumen({ item }: { item: ItemPlanificacion }) {
+  const vigentes = item.comentarios.filter((c) => c.eliminado_en === null).length;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="max-w-44 truncate text-sm" title={item.observaciones ?? undefined}>
+        {item.observaciones ?? <span className="text-muted-foreground">—</span>}
+      </span>
+      <Dialog>
+        <DialogTrigger
+          render={
+            <Button size="sm" variant="outline" className="h-11 gap-1.5 px-3" aria-label={`Ver observaciones (${vigentes} de usuarios)`} title="Ver y agregar observaciones">
+              <MessageSquareIcon /> {vigentes > 0 ? vigentes : "Ver"}
+            </Button>
+          }
+        />
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Observaciones — {item.codigo_pedido}</DialogTitle>
+            <DialogDescription>{item.cliente ?? "Sin cliente"}</DialogDescription>
+          </DialogHeader>
+          <ObservacionesCelda item={item} />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function Acciones({ item, estacion, semana }: { item: ItemPlanificacion; estacion: EstacionPlanificacion; semana: string }) {
   return (
     <div className="flex items-center gap-1">
       <ItemDialog
+        estacionId={estacion.id}
         tipo={item.tipo}
         semana={semana}
         item={item}
         trigger={
-          <Button size="sm" variant="outline" aria-label="Editar fila" title="Editar fila">
+          <Button size="sm" variant="outline" className="size-11" aria-label="Editar fila" title="Editar fila">
             <PencilIcon />
           </Button>
         }
       />
       <ConfirmActionButton
         variant="destructive"
+        className="size-11"
         ariaLabel="Quitar fila"
         label={<Trash2Icon />}
         title="¿Quitar la fila?"
-        description={<>Se quita «{item.n_tw || item.cliente}» de la planificación, con sus marcas.</>}
+        description={<>Se quita «{item.codigo_pedido}» de la planificación, con sus marcas.</>}
         confirmLabel="Quitar"
         successMessage="Fila quitada."
         errorTitle="No se pudo quitar la fila"
@@ -87,10 +138,35 @@ function Acciones({ item, semana }: { item: ItemPlanificacion; semana: string })
   );
 }
 
-function Tabla({ tipo, data, puedeGestionar }: { tipo: TipoPlanificacion; data: SemanaPlanificacion; puedeGestionar: boolean }) {
-  const filas = data.items.filter((i) => i.tipo === tipo);
+function Tabla({
+  tipo,
+  data,
+  puedeGestionar,
+  itemResaltado,
+}: {
+  tipo: TipoPlanificacion;
+  data: SemanaPlanificacion;
+  puedeGestionar: boolean;
+  itemResaltado: string | null;
+}) {
+  const filas = data.items.filter((i) => i.tipo === tipo).sort((a, b) => a.orden - b.orden);
+  const { ordenados, mover } = useOrdenOptimista(filas, (ids) =>
+    enviarOrden("/planificacion-api/reordenar", { estacion_id: data.estacion.id, semana: data.semana_inicio, tipo, ids }),
+  );
+  const [filtroFecha, setFiltroFecha] = useState<Set<string> | null>(null);
+  const opcionesFecha = opcionesDeFecha(filas.map((i) => i.compromiso));
+  // Si cambia la semana y ya no existen las fechas filtradas, no queda nada que mostrar: se ignora el filtro.
+  const filtroVigente = filtroFecha && opcionesFecha.some((o) => filtroFecha.has(o.clave)) ? filtroFecha : null;
+  const visibles = filtroVigente ? ordenados.filter((i) => filtroVigente.has(i.compromiso ?? SIN_FECHA)) : ordenados;
+  // Reordenar con filtro activo no tiene sentido (el orden es de toda la lista): sin asas mientras haya filtro.
+  const puedeOrdenar = puedeGestionar && !filtroVigente;
   const reclamos = tipo === "RECLAMOS";
-  const columnas = reclamos ? 11 : 10;
+  const columnas = (reclamos ? 10 : 8) + (puedeGestionar ? 2 : 0);
+  const resaltada = useRef<HTMLTableRowElement | null>(null);
+
+  useEffect(() => {
+    resaltada.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [itemResaltado]);
 
   return (
     <section className="flex flex-col gap-2">
@@ -105,20 +181,30 @@ function Tabla({ tipo, data, puedeGestionar }: { tipo: TipoPlanificacion; data: 
         )}
         {puedeGestionar && (
           <ItemDialog
+            estacionId={data.estacion.id}
             tipo={tipo}
             semana={data.semana_inicio}
             trigger={
-              <Button variant="outline" className="h-10 px-4">
+              <Button variant="outline" className="h-11 px-4">
                 <PlusIcon /> Agregar
               </Button>
             }
           />
         )}
       </div>
+      {filtroVigente && (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          Filtro de compromiso activo: se muestran {visibles.length} de {filas.length}. Para reordenar hay que quitar el filtro.
+          <Button size="sm" variant="outline" className="h-9 px-3" onClick={() => setFiltroFecha(null)}>
+            Quitar filtro
+          </Button>
+        </p>
+      )}
       <div className="overflow-x-auto rounded-lg border">
-        <Table>
+        <Table className="[&_td]:py-1">
           <TableHeader>
             <TableRow>
+              {puedeGestionar && <TableHead className="w-14" />}
               <TableHead>Cliente</TableHead>
               {reclamos && <TableHead>Distribuidor</TableHead>}
               {reclamos && <TableHead>Ticket</TableHead>}
@@ -127,47 +213,94 @@ function Tabla({ tipo, data, puedeGestionar }: { tipo: TipoPlanificacion; data: 
               {!reclamos && <TableHead>N° Orden</TableHead>}
               {reclamos ? <TableHead>Tipo</TableHead> : <TableHead>Modelo</TableHead>}
               <TableHead>Color</TableHead>
-              {reclamos ? <TableHead>Compromiso</TableHead> : <TableHead>Fábrica</TableHead>}
-              {reclamos ? <TableHead>Finalizado</TableHead> : <TableHead>Fecha límite</TableHead>}
+              <TableHead>
+                <span className="inline-flex items-center gap-1">
+                  Compromiso
+                  <FiltroCompromiso opciones={opcionesFecha} seleccion={filtroVigente} onChange={setFiltroFecha} />
+                </span>
+              </TableHead>
+              {reclamos && <TableHead>Finalizado</TableHead>}
               <TableHead>Observaciones</TableHead>
               {puedeGestionar && <TableHead />}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filas.length === 0 && (
+            {visibles.length === 0 && (
               <TableRow>
-                <TableCell colSpan={columnas + (puedeGestionar ? 1 : 0)} className="py-8 text-center text-muted-foreground">
-                  {reclamos ? "No hay reclamos cargados para esta semana." : "No hay pedidos cargados para esta semana."}
+                <TableCell colSpan={columnas} className="py-8 text-center text-muted-foreground">
+                  {ordenados.length > 0
+                    ? "Ninguna fila coincide con el filtro."
+                    : reclamos
+                      ? "No hay reclamos cargados para esta semana."
+                      : "No hay pedidos cargados para esta semana."}
                 </TableCell>
               </TableRow>
             )}
-            {filas.map((i) => {
-              const completo = data.estados.length > 0 && data.estados.every((e) => i.marcas.some((m) => m.estado_id === e.id));
-              return (
-                <TableRow key={i.id} style={i.marcas.length > 0 ? { backgroundColor: `${colorDe(i.marcas[i.marcas.length - 1].color)}${completo ? "2e" : "1a"}` } : undefined}>
-                  <TableCell className="min-w-40 font-medium">{v(i.cliente)}</TableCell>
-                  {reclamos && <TableCell>{v(i.distribuidor)}</TableCell>}
-                  {reclamos && <TableCell className="whitespace-nowrap">{v(i.ticket)}</TableCell>}
-                  <TableCell className="font-medium whitespace-nowrap">{v(i.n_tw)}</TableCell>
-                  <TableCell className="min-w-44">
-                    <Estados item={i} data={data} />
-                  </TableCell>
-                  {!reclamos && <TableCell>{v(i.n_orden)}</TableCell>}
-                  {reclamos ? <TableCell className="min-w-40">{v(i.tipo_reclamo)}</TableCell> : <TableCell className="whitespace-nowrap">{v(i.modelo)}</TableCell>}
-                  <TableCell className="whitespace-nowrap">{v(i.color)}</TableCell>
-                  {reclamos ? <TableCell className="whitespace-nowrap">{f(i.compromiso)}</TableCell> : <TableCell className="whitespace-nowrap">{f(i.fabrica)}</TableCell>}
-                  {reclamos ? <TableCell className="whitespace-nowrap">{f(i.finalizado_en)}</TableCell> : <TableCell className="whitespace-nowrap">{f(i.fecha_limite)}</TableCell>}
-                  <TableCell className="min-w-56">
-                    <ObservacionesCelda item={i} />
-                  </TableCell>
-                  {puedeGestionar && (
-                    <TableCell>
-                      <Acciones item={i} semana={data.semana_inicio} />
-                    </TableCell>
-                  )}
-                </TableRow>
-              );
-            })}
+            <ListaOrdenable ids={visibles.map((i) => i.id)} onMover={mover}>
+              {visibles.map((i) => {
+                const completo = data.estados.length > 0 && data.estados.every((e) => i.marcas.some((m) => m.estado_id === e.id));
+                const esResaltada = i.id === itemResaltado;
+                return (
+                  <FilaOrdenable
+                    key={i.id}
+                    id={i.id}
+                    habilitado={puedeOrdenar}
+                    className={esResaltada ? "outline-2 -outline-offset-2 outline-gold" : undefined}
+                    style={i.marcas.length > 0 ? { backgroundColor: `${colorDe(i.marcas[i.marcas.length - 1].color)}${completo ? "2e" : "1a"}` } : undefined}
+                    rowProps={{ ref: esResaltada ? resaltada : undefined, id: `fila-${i.id}` }}
+                  >
+                    {(asa) => (
+                      <>
+                        {puedeGestionar && <TableCell className="w-14">{asa}</TableCell>}
+
+                        <TableCell className="max-w-48 font-medium">
+                          <LinkPedido item={i} className="block truncate">
+                            <span title={i.cliente ?? undefined}>{v(i.cliente)}</span>
+                          </LinkPedido>
+                        </TableCell>
+                        {reclamos && <TableCell className="max-w-36 truncate">{v(i.distribuidor)}</TableCell>}
+                        {reclamos && <TableCell className="whitespace-nowrap">{v(i.ticket)}</TableCell>}
+                        <TableCell className="font-medium whitespace-nowrap">
+                          <LinkPedido item={i}>{i.codigo_pedido}</LinkPedido>
+                        </TableCell>
+                        <TableCell className="min-w-40">
+                          <Estados item={i} data={data} />
+                        </TableCell>
+                        {!reclamos && (
+                          <TableCell className="whitespace-nowrap">
+                            {i.orden_id && i.n_orden ? (
+                              <Link href={`/ordenes/${i.orden_id}`} className="hover:underline">
+                                {i.n_orden}
+                              </Link>
+                            ) : (
+                              v(i.n_orden)
+                            )}
+                          </TableCell>
+                        )}
+                        {reclamos ? (
+                          <TableCell className="max-w-44 truncate" title={i.tipo_reclamo ?? undefined}>
+                            {v(i.tipo_reclamo)}
+                          </TableCell>
+                        ) : (
+                          <TableCell className="whitespace-nowrap">{v(i.modelo)}</TableCell>
+                        )}
+                        <TableCell className="whitespace-nowrap">{v(i.color)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{f(i.compromiso)}</TableCell>
+                        {reclamos && <TableCell className="whitespace-nowrap">{f(i.finalizado_en)}</TableCell>}
+                        <TableCell>
+                          <ObservacionesResumen item={i} />
+                        </TableCell>
+                        {puedeGestionar && (
+                          <TableCell>
+                            <Acciones item={i} estacion={data.estacion} semana={data.semana_inicio} />
+                          </TableCell>
+                        )}
+                      </>
+                    )}
+                  </FilaOrdenable>
+                );
+              })}
+            </ListaOrdenable>
           </TableBody>
         </Table>
       </div>
@@ -175,17 +308,53 @@ function Tabla({ tipo, data, puedeGestionar }: { tipo: TipoPlanificacion; data: 
   );
 }
 
-// Planificación de una semana (pedidos y reclamos) con el marcado de estados de producción.
-export function PlanificacionSemana({ data, puedeGestionar, semanaActual }: { data: SemanaPlanificacion; puedeGestionar: boolean; semanaActual: string }) {
+// Planificación de una semana de una estación (pedidos y reclamos) con el marcado de estados de producción.
+export function PlanificacionSemana({
+  data,
+  estaciones,
+  puedeGestionar,
+  semanaActual,
+  itemResaltado,
+}: {
+  data: SemanaPlanificacion;
+  estaciones: EstacionPlanificacion[];
+  puedeGestionar: boolean;
+  semanaActual: string;
+  itemResaltado: string | null;
+}) {
+  const est = data.estacion.id;
   const anterior = mas(data.semana_inicio, -7);
   const siguiente = mas(data.semana_inicio, 7);
   const esActual = data.semana_inicio === semanaActual;
   const otras = data.semanas.filter((s) => s !== data.semana_inicio);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Planificación semanal — {data.estacion.nombre}</h1>
+          <p className="text-sm text-muted-foreground">Pedidos y reclamos de la semana que carga la oficina técnica.</p>
+        </div>
+        <BuscadorPedido estacionId={est} />
+      </div>
+
+      {estaciones.length > 1 && (
+        <nav aria-label="Estación de trabajo" className="flex flex-wrap gap-2">
+          {estaciones.map((e) => (
+            <Link
+              key={e.id}
+              href={href(e.id)}
+              aria-current={e.id === est ? "page" : undefined}
+              className={`inline-flex h-11 items-center rounded-lg border px-4 text-sm font-medium ${e.id === est ? "border-transparent bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            >
+              {e.nombre}
+            </Link>
+          ))}
+        </nav>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
-        <Link href={`/planificacion?semana=${anterior}`} aria-label="Semana anterior" className="inline-flex size-11 items-center justify-center rounded-lg border hover:bg-muted">
+        <Link href={href(est, anterior)} aria-label="Semana anterior" className="inline-flex size-11 items-center justify-center rounded-lg border hover:bg-muted">
           <ChevronLeftIcon />
         </Link>
         <div className="flex min-w-0 flex-col px-1">
@@ -194,22 +363,23 @@ export function PlanificacionSemana({ data, puedeGestionar, semanaActual }: { da
           </span>
           {esActual && <span className="text-xs font-medium text-gold">Esta semana</span>}
         </div>
-        <Link href={`/planificacion?semana=${siguiente}`} aria-label="Semana siguiente" className="inline-flex size-11 items-center justify-center rounded-lg border hover:bg-muted">
+        <Link href={href(est, siguiente)} aria-label="Semana siguiente" className="inline-flex size-11 items-center justify-center rounded-lg border hover:bg-muted">
           <ChevronRightIcon />
         </Link>
         {!esActual && (
-          <Link href="/planificacion" className="inline-flex h-11 items-center rounded-lg border px-4 text-sm font-medium hover:bg-muted">
+          <Link href={href(est)} className="inline-flex h-11 items-center rounded-lg border px-4 text-sm font-medium hover:bg-muted">
             Ir a esta semana
           </Link>
         )}
         {otras.length > 0 && (
           <form action="/planificacion" method="get" className="ml-auto">
+            <input type="hidden" name="estacion" value={est} />
             <select
               name="semana"
               defaultValue=""
               aria-label="Ir a otra semana con planificación"
               onChange={(e) => e.currentTarget.form?.requestSubmit()}
-              className="h-11 rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className={SELECT}
             >
               <option value="" disabled>
                 Otras semanas…
@@ -244,8 +414,8 @@ export function PlanificacionSemana({ data, puedeGestionar, semanaActual }: { da
         )}
       </p>
 
-      <Tabla tipo="PEDIDOS" data={data} puedeGestionar={puedeGestionar} />
-      <Tabla tipo="RECLAMOS" data={data} puedeGestionar={puedeGestionar} />
+      <Tabla tipo="PEDIDOS" data={data} puedeGestionar={puedeGestionar} itemResaltado={itemResaltado} />
+      <Tabla tipo="RECLAMOS" data={data} puedeGestionar={puedeGestionar} itemResaltado={itemResaltado} />
     </div>
   );
 }

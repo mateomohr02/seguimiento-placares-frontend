@@ -9,6 +9,7 @@ import { SeleccionMultiple } from "@/components/seleccion-multiple";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { nombreCompleto } from "@/lib/auth/permisos";
 import { ESTACIONES, ETIQUETA_ESTACION } from "@/modules/planilla/lib/estaciones";
+import { ETIQUETA_PLANTILLA, type PlantillaPlanificacion } from "@/modules/planificacion/types/planificacion.types";
 import type { EstadoProduccion } from "@/modules/planilla/types/planilla.types";
 import { actualizarEstacionAction, crearEstacionAction } from "../actions/estacion-trabajo.actions";
 import type { EstacionTrabajo, EstacionTrabajoCambios, EstacionTrabajoInput, UsuarioDeEstacion } from "../types/estacion-trabajo.types";
@@ -20,11 +21,12 @@ interface Valores extends EstacionTrabajoInput {
   usuarios_ids: string[];
 }
 
-const vacio = (): Valores => ({ nombre: "", planillas: [], estado_id: null, usuarios_ids: [] });
+const vacio = (): Valores => ({ nombre: "", planillas: [], estado_id: null, plantilla_planificacion: null, usuarios_ids: [] });
 const desdeEstacion = (e: EstacionTrabajo): Valores => ({
   nombre: e.nombre,
   planillas: e.planillas,
   estado_id: e.estado_id,
+  plantilla_planificacion: e.plantilla_planificacion,
   usuarios_ids: e.usuarios.map((u) => u.id),
 });
 
@@ -83,12 +85,13 @@ export function EstacionDialog({
     startTransition(async () => {
       let r;
       if (!estacion) {
-        r = await crearEstacionAction({ nombre, planillas, estado_id: v.estado_id }, usuarios ? v.usuarios_ids : []);
+        r = await crearEstacionAction({ nombre, planillas, estado_id: v.estado_id, plantilla_planificacion: v.plantilla_planificacion }, usuarios ? v.usuarios_ids : []);
       } else {
         const c: EstacionTrabajoCambios = {};
         if (nombre !== estacion.nombre) c.nombre = nombre;
         if (!mismo(planillas, estacion.planillas)) c.planillas = planillas;
         if (v.estado_id !== estacion.estado_id) c.estado_id = v.estado_id;
+        if (v.plantilla_planificacion !== estacion.plantilla_planificacion) c.plantilla_planificacion = v.plantilla_planificacion;
         if (usuarios && !mismo(v.usuarios_ids, estacion.usuarios.map((u) => u.id))) c.usuarios_ids = v.usuarios_ids;
         if (Object.keys(c).length === 0) {
           setOpen(false);
@@ -135,6 +138,21 @@ export function EstacionDialog({
                   </option>
                 ))}
               </select>
+            </Campo>
+            <Campo etiqueta="Plantilla de planificación">
+              <select
+                value={v.plantilla_planificacion ?? ""}
+                onChange={(e) => setV((p) => ({ ...p, plantilla_planificacion: (e.target.value || null) as PlantillaPlanificacion | null }))}
+                className={SELECT}
+              >
+                <option value="">Ninguna</option>
+                {(Object.keys(ETIQUETA_PLANTILLA) as PlantillaPlanificacion[]).map((k) => (
+                  <option key={k} value={k}>
+                    {ETIQUETA_PLANTILLA[k]}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-muted-foreground">Con plantilla, la estación tiene su propia planificación semanal; sin ella no aparece en Planificación.</span>
             </Campo>
           </div>
 
