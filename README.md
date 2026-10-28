@@ -294,7 +294,7 @@ Cada **usuario es una persona** (operario, técnica, gerencia o admin) con su **
 
 - **Listado**: nombre y apellido, rol, estaciones, **PIN** y último acceso. **Ocultar PIN / Mostrar PIN** tapa o muestra los PIN de todo el listado (por ejemplo, si hay alguien mirando la pantalla). Filtros: **Estación** (todas, sin estación o una en particular), **Estado** (activos —por defecto—, dados de baja o todos) y **Buscar** por nombre o apellido.
 - **Nuevo usuario** y **Editar**: nombre, apellido, PIN (de **4 a 10 números**, con el ojo para verlo u ocultarlo), rol y estaciones (casillas). **PIN** abre solo el cambio de PIN. El PIN no puede ser el de otra persona y no puede haber dos personas con el mismo nombre y apellido (sin importar mayúsculas): si pasa, el formulario muestra el motivo en rojo y no se cierra.
-- **Roles**: técnica puede dar cualquier rol menos **admin**; solo un admin crea o edita admins (técnica ni siquiera los ve en el listado).
+- **Roles**: técnica puede dar cualquier rol menos **admin**; **nadie crea usuarios admin desde la app** (el alta de un admin se hace por base), solo un admin edita admins (técnica ni siquiera los ve en el listado). Nadie puede cambiar su propio rol: el selector de tu propia fila está bloqueado.
 - **Dar de baja** (con confirmación) deja a la persona sin acceso a la app, pero **no la borra** (sus estaciones quedan asignadas): las planillas que completó conservan su nombre. Se ve con el filtro «Dados de baja» y **Reactivar** le devuelve el acceso con su rol y sus estaciones. Nadie puede darse de baja a sí mismo (su fila dice «Vos» y el botón está deshabilitado).
 
 ### Aviso de red
