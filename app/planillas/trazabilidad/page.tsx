@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ESTACIONES, ETIQUETA_ESTACION, fechaCorta, formatoMinutos } from "@/modules/planilla/lib/estaciones";
+import { ESTACIONES, ETIQUETA_ESTACION, etiquetaMesa, fechaCorta, formatoMinutos } from "@/modules/planilla/lib/estaciones";
 import type { Trazabilidad } from "@/modules/planilla/types/planilla.types";
 
 // Recorrido de un pedido por Lijado → Encolado → PVC según las planillas.
@@ -92,6 +92,7 @@ export default async function TrazabilidadPage({ searchParams }: { searchParams:
                   <TableHead>Fecha</TableHead>
                   <TableHead>Planilla</TableHead>
                   <TableHead>Estación de trabajo</TableHead>
+                  <TableHead>Mesa</TableHead>
                   <TableHead>Inicio</TableHead>
                   <TableHead>Fin</TableHead>
                   <TableHead className="text-right">Piezas</TableHead>
@@ -104,7 +105,7 @@ export default async function TrazabilidadPage({ searchParams }: { searchParams:
               <TableBody>
                 {traza.registros.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
                       Ese pedido no figura en ninguna planilla.
                     </TableCell>
                   </TableRow>
@@ -114,6 +115,7 @@ export default async function TrazabilidadPage({ searchParams }: { searchParams:
                     <TableCell>{fechaCorta(r.fecha)}</TableCell>
                     <TableCell>{ETIQUETA_ESTACION[r.estacion]}</TableCell>
                     <TableCell className="whitespace-nowrap">{r.estacion_trabajo?.nombre ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap">{r.estacion === "PVC" ? etiquetaMesa(r.mesa_tamano, r.mesa_cantidad) : "—"}</TableCell>
                     <TableCell>{r.hora_inicio ?? "—"}</TableCell>
                     <TableCell>{r.hora_fin ?? "—"}</TableCell>
                     <TableCell className="text-right">{r.cantidad_piezas ?? "—"}</TableCell>

@@ -9,6 +9,18 @@ export interface FotoFila {
   creado_en: string;
 }
 
+export type MesaTamano = "CHICA" | "GRANDE";
+
+/** Pedido de una tanda de PVC con las piezas de ese pedido que entraron en la tanda. */
+export interface PedidoFila {
+  id: string;
+  orden: number;
+  pedido_codigo: string;
+  pedido_id: string | null;
+  cantidad_piezas: number;
+}
+
+/** Fila de la planilla. En PVC es una TANDA DE MESAS (`mesa_*` + `pedidos`; `cantidad_piezas` = suma de sus pedidos, `pedido_codigo` = ""). */
 export interface FilaPlanilla {
   id: string;
   orden: number;
@@ -21,8 +33,9 @@ export interface FilaPlanilla {
   colocacion_pvc: string | null;
   perfilado: string | null;
   colores: string | null;
-  mesa_chica: number | null;
-  mesa_grande: number | null;
+  mesa_tamano: MesaTamano | null;
+  mesa_cantidad: number | null;
+  pedidos: PedidoFila[];
   fotos: FotoFila[];
 }
 
@@ -75,13 +88,20 @@ export interface Planilla {
   versiones: VersionPlanilla[];
 }
 
+/** Las versiones guardadas antes de PVC por mesa pueden no traer `pedidos`, `mesa_tamano` ni `mesa_cantidad` (o traer `mesa_chica`/`mesa_grande`). */
+export type FilaVersion = Omit<FilaPlanilla, "fotos" | "pedidos" | "mesa_tamano" | "mesa_cantidad"> &
+  Partial<Pick<FilaPlanilla, "pedidos" | "mesa_tamano" | "mesa_cantidad">> & { mesa_chica?: number | null; mesa_grande?: number | null; fotos: number; fotos_lista?: FotoFila[] };
+
 export interface DatosVersion extends VersionPlanilla {
   planilla_id: string;
-  datos: { estado: EstadoPlanilla; operarios: (string | { nombre: string })[]; filas: (Omit<FilaPlanilla, "fotos"> & { fotos: number; fotos_lista?: FotoFila[] })[] };
+  datos: { estado: EstadoPlanilla; operarios: (string | { nombre: string })[]; filas: FilaVersion[] };
 }
 
 export interface RegistroPlanilla {
+  /** En PVC: id del pedido dentro de la tanda (una fila de registro por tanda y pedido). */
   id: string;
+  /** La tanda (fila de la planilla); en Lijado/Encolado es igual a `id`. */
+  fila_id: string;
   planilla_id: string;
   estacion: Estacion;
   estacion_trabajo: EstacionTrabajoRef;
@@ -98,8 +118,10 @@ export interface RegistroPlanilla {
   colocacion_pvc: string | null;
   perfilado: string | null;
   colores: string | null;
-  mesa_chica: number | null;
-  mesa_grande: number | null;
+  mesa_tamano: MesaTamano | null;
+  mesa_cantidad: number | null;
+  /** Total de piezas de la tanda (PVC); `cantidad_piezas` es solo el de este pedido. */
+  piezas_tanda: number | null;
   fotos: number;
   versiones: number;
 }
@@ -131,7 +153,12 @@ export interface Indicadores {
     piezas: number;
     minutos: number;
     piezasPorHora: number | null;
+    /** Solo PVC. */
+    mesas_chicas?: number | null;
+    mesas_grandes?: number | null;
+    mesas_por_hora?: number | null;
   }[];
+  mesasPorDia: { fecha: string; chicas: number; grandes: number }[];
   porDia: { fecha: string; piezas: Record<Estacion, number> }[];
   pedidos: { total: number; completos: number; enProceso: number; conDiferencia: number; detalle: ResumenPedido[] };
 }
@@ -144,6 +171,9 @@ export interface RegistroTraza {
   hora_inicio: string | null;
   hora_fin: string | null;
   cantidad_piezas: number | null;
+  /** Solo PVC: tamaño y cantidad de mesas de la tanda (las horas y fotos son de la tanda completa). */
+  mesa_tamano?: MesaTamano | null;
+  mesa_cantidad?: number | null;
   fotos: number;
   estado: EstadoPlanilla;
   observaciones: string | null;
