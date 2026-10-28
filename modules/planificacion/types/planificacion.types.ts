@@ -14,6 +14,30 @@ export interface MarcaPlanificacion {
   marcado_en: string;
 }
 
+export interface HistorialObservacion {
+  id: string;
+  accion: "CREADA" | "EDITADA" | "ELIMINADA" | string;
+  texto: string;
+  por: string;
+  en: string;
+}
+
+/** Observación de un usuario en una fila (incluye las borradas, con `eliminado_en`, solo para el historial). */
+export interface ObservacionPlanificacion {
+  id: string;
+  usuario_id: string | null;
+  autor: string;
+  texto: string;
+  creado_en: string;
+  editado_en: string | null;
+  eliminado_en: string | null;
+  eliminado_por: string | null;
+  /** Calculados por el backend para quien mira: editar solo las propias; borrar las propias o, con gestión, cualquiera. */
+  puede_editar: boolean;
+  puede_borrar: boolean;
+  historial: HistorialObservacion[];
+}
+
 export interface ItemPlanificacion {
   id: string;
   tipo: TipoPlanificacion;
@@ -33,6 +57,7 @@ export interface ItemPlanificacion {
   finalizado_en: string | null;
   observaciones: string | null;
   marcas: MarcaPlanificacion[];
+  comentarios: ObservacionPlanificacion[];
 }
 
 export interface EstadoBasico {
