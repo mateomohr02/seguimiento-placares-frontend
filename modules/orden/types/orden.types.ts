@@ -1,3 +1,5 @@
+import type { Linea } from "@/lib/linea";
+
 export type OrdenEstado = "PENDIENTE" | "EN_PROCESO" | "LISTA" | "ELIMINADO";
 
 export interface Orden {
@@ -6,6 +8,7 @@ export interface Orden {
   numeroOrdenCustom: string;
   descripcion: string;
   estado: OrdenEstado;
+  lineas: Linea[];
   creado_en: string;
   archivada_en: string | null;
   pedidosCount: number;

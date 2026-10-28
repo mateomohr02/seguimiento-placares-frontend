@@ -19,6 +19,7 @@ export default async function IndicadoresPage({ searchParams }: { searchParams: 
   const { desde, hasta } = rangoPorDefecto(hoyLocal(), f.desde, f.hasta);
   const ind = await apiFetch<Indicadores>(`/planillas/indicadores?desde=${desde}&hasta=${hasta}`);
   const maxDia = Math.max(1, ...ind.porDia.flatMap((d) => ESTACIONES.map((e) => d.piezas[e])));
+  const maxMesas = Math.max(1, ...(ind.mesasPorDia ?? []).flatMap((d) => [d.chicas, d.grandes]));
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6">
@@ -50,14 +51,28 @@ export default async function IndicadoresPage({ searchParams }: { searchParams: 
             <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
               <dt className="text-muted-foreground">Pedidos</dt>
               <dd className="text-right">{e.pedidos}</dd>
-              <dt className="text-muted-foreground">Registros</dt>
+              <dt className="text-muted-foreground">{e.estacion === "PVC" ? "Tandas de mesas" : "Registros"}</dt>
               <dd className="text-right">{e.registros}</dd>
+              {e.estacion === "PVC" && (
+                <>
+                  <dt className="text-muted-foreground">Mesas chicas</dt>
+                  <dd className="text-right">{e.mesas_chicas ?? 0}</dd>
+                  <dt className="text-muted-foreground">Mesas grandes</dt>
+                  <dd className="text-right">{e.mesas_grandes ?? 0}</dd>
+                </>
+              )}
               <dt className="text-muted-foreground">Días con carga</dt>
               <dd className="text-right">{e.dias}</dd>
               <dt className="text-muted-foreground">Tiempo trabajado</dt>
               <dd className="text-right">{e.minutos > 0 ? formatoMinutos(e.minutos) : "—"}</dd>
               <dt className="text-muted-foreground">Piezas por hora</dt>
               <dd className="text-right">{e.piezasPorHora ?? "—"}</dd>
+              {e.estacion === "PVC" && (
+                <>
+                  <dt className="text-muted-foreground">Mesas por hora</dt>
+                  <dd className="text-right">{e.mesas_por_hora ?? "—"}</dd>
+                </>
+              )}
             </dl>
           </div>
         ))}
@@ -86,6 +101,46 @@ export default async function IndicadoresPage({ searchParams }: { searchParams: 
                     <div key={e} className="flex items-center gap-2">
                       <div className="h-3 rounded-sm" style={{ width: `${(d.piezas[e] / maxDia) * 100}%`, minWidth: d.piezas[e] > 0 ? 4 : 0, background: COLOR[e] }} />
                       <span className="text-xs tabular-nums">{d.piezas[e]}</span>
+                    </div>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-label="Mesas de PVC por día" className="flex flex-col gap-3 rounded-lg border p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">Mesas de PVC por día</h2>
+          <ul className="flex gap-4 text-sm">
+            <li className="flex items-center gap-1.5">
+              <span className="size-3 rounded-sm" style={{ background: "var(--chart-2)" }} aria-hidden /> Chicas
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span className="size-3 rounded-sm" style={{ background: "var(--foreground)" }} aria-hidden /> Grandes
+            </li>
+          </ul>
+        </div>
+        {(ind.mesasPorDia ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">No hay mesas de PVC cargadas en este rango.</p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {ind.mesasPorDia.map((d) => (
+              <li key={d.fecha} className="grid grid-cols-[5.5rem_1fr] items-center gap-3">
+                <span className="text-sm text-muted-foreground">{fechaCorta(d.fecha)}</span>
+                <div className="flex flex-col gap-1">
+                  {(
+                    [
+                      ["Chicas", d.chicas, "var(--chart-2)"],
+                      ["Grandes", d.grandes, "var(--foreground)"],
+                    ] as const
+                  ).map(([nombre, n, color]) => (
+                    <div key={nombre} className="flex items-center gap-2">
+                      <div className="h-3 rounded-sm" style={{ width: `${(n / maxMesas) * 100}%`, minWidth: n > 0 ? 4 : 0, background: color }} />
+                      <span className="text-xs tabular-nums">
+                        {n} <span className="sr-only">{nombre.toLowerCase()}</span>
+                      </span>
                     </div>
                   ))}
                 </div>

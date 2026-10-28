@@ -7,7 +7,7 @@ import { ColumnFilter } from "@/components/column-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ETIQUETA_ESTACION, fechaCorta, slugEstacion } from "../lib/estaciones";
+import { ETIQUETA_ESTACION, etiquetaMesa, fechaCorta, rutaPlanilla, slugEstacion } from "../lib/estaciones";
 import type { Estacion, RegistroPlanilla } from "../types/planilla.types";
 
 // Registros de producción de Termolaminado: una tabla por planilla (Lijado, Encolado y PVC), cada una con sus columnas y
@@ -30,6 +30,7 @@ interface Col {
 const v = (x: string | number | null) => (x === null || x === "" ? "—" : String(x));
 
 const COL_FECHA: Col = { key: "fecha", label: "Fecha", value: (r) => fechaCorta(r.fecha), sortKey: (r) => r.fecha, filtrable: true, className: "whitespace-nowrap" };
+const COL_ESTACION: Col = { key: "estacion", label: "Estación", value: (r) => r.estacion_trabajo?.nombre ?? "—", filtrable: true, className: "whitespace-nowrap" };
 const COL_PEDIDO: Col = {
   key: "pedido",
   label: "N° pedido",
@@ -45,6 +46,15 @@ const COL_PEDIDO: Col = {
       "—"
     ),
 };
+/** Cuántas tandas distintas hay (en PVC un registro es un pedido de una tanda: la tanda se cuenta una sola vez). */
+const tandasDe = (rs: RegistroPlanilla[]) => new Set(rs.map((r) => r.fila_id ?? r.id));
+/** Fotos sin duplicar: las de cada tanda se cuentan una vez aunque la tanda salga en varias filas. */
+const fotosDe = (rs: RegistroPlanilla[]) => {
+  const porTanda = new Map<string, number>();
+  for (const r of rs) porTanda.set(r.fila_id ?? r.id, r.fotos);
+  return [...porTanda.values()].reduce((s, n) => s + n, 0);
+};
+
 const COL_INICIO: Col = { key: "inicio", label: "Inicio", value: (r) => v(r.hora_inicio), filtrable: false };
 const COL_FIN: Col = { key: "fin", label: "Fin", value: (r) => v(r.hora_fin), filtrable: false };
 const COL_PIEZAS: Col = { key: "piezas", label: "Piezas", value: (r) => v(r.cantidad_piezas), filtrable: true, align: "right" };
@@ -64,17 +74,18 @@ const COL_ESTADO: Col = {
 };
 
 const COLUMNAS: Record<Estacion, Col[]> = {
-  LIJADO: [COL_FECHA, COL_PEDIDO, COL_INICIO, COL_FIN, COL_PIEZAS, COL_OPERARIOS, COL_OBS, COL_ESTADO],
-  ENCOLADO: [COL_FECHA, COL_PEDIDO, COL_INICIO, COL_FIN, COL_PIEZAS, COL_OPERARIOS, COL_OBS, COL_ESTADO],
+  LIJADO: [COL_FECHA, COL_ESTACION, COL_PEDIDO, COL_INICIO, COL_FIN, COL_PIEZAS, COL_OPERARIOS, COL_OBS, COL_ESTADO],
+  ENCOLADO: [COL_FECHA, COL_ESTACION, COL_PEDIDO, COL_INICIO, COL_FIN, COL_PIEZAS, COL_OPERARIOS, COL_OBS, COL_ESTADO],
   PVC: [
     COL_FECHA,
+    COL_ESTACION,
+    { key: "mesa", label: "Mesa", value: (r) => etiquetaMesa(r.mesa_tamano, r.mesa_cantidad), filtrable: true, className: "whitespace-nowrap" },
     COL_PEDIDO,
+    { ...COL_PIEZAS, label: "Piezas del pedido" },
+    { key: "piezas_tanda", label: "Piezas de la tanda", value: (r) => v(r.piezas_tanda), filtrable: true, align: "right" },
+    { key: "colores", label: "Color", value: (r) => v(r.colores), filtrable: true },
     COL_INICIO,
     COL_FIN,
-    { ...COL_PIEZAS, label: "Piezas (total)" },
-    { key: "colores", label: "Colores", value: (r) => v(r.colores), filtrable: true },
-    { key: "chica", label: "Mesa chica", value: (r) => v(r.mesa_chica), filtrable: true, align: "right" },
-    { key: "grande", label: "Mesa grande", value: (r) => v(r.mesa_grande), filtrable: true, align: "right" },
     { key: "colocacion", label: "Colocación PVC", value: (r) => v(r.colocacion_pvc), filtrable: true, className: "max-w-48 truncate" },
     { key: "perfilado", label: "Perfilado", value: (r) => v(r.perfilado), filtrable: true, className: "max-w-48 truncate" },
     COL_OPERARIOS,
@@ -105,13 +116,14 @@ const ordenar = (a: string, b: string) => a.localeCompare(b, "es", { numeric: tr
 function TablaEstacion({
   estacion,
   registros,
-  puedeAbrir,
+  abrible,
   seleccion,
   setSeleccion,
 }: {
   estacion: Estacion;
   registros: RegistroPlanilla[];
-  puedeAbrir: boolean;
+  /** ¿Puede abrir la planilla de esa estación de trabajo? */
+  abrible: (r: RegistroPlanilla) => boolean;
   seleccion: Seleccion;
   setSeleccion: (fn: (s: Seleccion) => Seleccion) => void;
 }) {
@@ -140,9 +152,14 @@ function TablaEstacion({
   }, [registros, seleccion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activos = filtrables.filter((c) => seleccion[c.key]).length;
+  const pvc = estacion === "PVC";
   const piezas = filas.reduce((s, r) => s + (r.cantidad_piezas ?? 0), 0);
   const piezasTotal = registros.reduce((s, r) => s + (r.cantidad_piezas ?? 0), 0);
+  // En PVC se cuentan tandas (no filas pedido-tanda); las fotos y las piezas no se duplican.
+  const nFilas = pvc ? tandasDe(filas).size : filas.length;
+  const nTotal = pvc ? tandasDe(registros).size : registros.length;
   const filtrado = filas.length !== registros.length;
+  const unidad = pvc ? "tanda" : "registro";
 
   return (
     <section id={slugEstacion(estacion)} className="flex flex-col gap-2">
@@ -150,9 +167,10 @@ function TablaEstacion({
         <h2 className="text-lg font-semibold">
           {ETIQUETA_ESTACION[estacion]}{" "}
           <span className="text-sm font-normal text-muted-foreground" aria-live="polite">
-            {filtrado ? `${filas.length} de ${registros.length} registros` : `${registros.length} registro${registros.length === 1 ? "" : "s"}`}
+            {filtrado ? `${nFilas} de ${nTotal} ${unidad}s` : `${nTotal} ${unidad}${nTotal === 1 ? "" : "s"}`}
             {" · "}
             {filtrado ? `${piezas} de ${piezasTotal} piezas` : `${piezasTotal} pieza${piezasTotal === 1 ? "" : "s"}`}
+            {pvc && fotosDe(registros) > 0 && ` · ${filtrado ? `${fotosDe(filas)} de ${fotosDe(registros)}` : fotosDe(registros)} fotos`}
           </span>
         </h2>
         {activos > 0 && (
@@ -203,10 +221,10 @@ function TablaEstacion({
                   <Link href={`/planillas/detalle/${r.planilla_id}`} className="text-sm underline-offset-4 hover:underline">
                     Detalle
                   </Link>
-                  {puedeAbrir && (
+                  {abrible(r) && (
                     <>
                       {" · "}
-                      <Link href={`/planillas/${slugEstacion(r.estacion)}?fecha=${r.fecha}`} className="text-sm underline-offset-4 hover:underline">
+                      <Link href={rutaPlanilla(r.estacion, r.estacion_trabajo.id, r.fecha)} className="text-sm underline-offset-4 hover:underline">
                         Abrir
                       </Link>
                     </>
@@ -223,7 +241,20 @@ function TablaEstacion({
 
 const MS_SALIDA = 200;
 
-export function RegistrosPlanillas({ registros, abribles, estaciones }: { registros: RegistroPlanilla[]; abribles: Estacion[]; estaciones: Estacion[] }) {
+/** `estacionesAbribles`: ids de las estaciones de trabajo cuyas planillas puede abrir el usuario (`todas` = técnica/admin, cualquiera). */
+export function RegistrosPlanillas({
+  registros,
+  abribles,
+  estacionesAbribles,
+  todas,
+  estaciones,
+}: {
+  registros: RegistroPlanilla[];
+  abribles: Estacion[];
+  estacionesAbribles: string[];
+  todas: boolean;
+  estaciones: Estacion[];
+}) {
   const porEstacion = useMemo(
     () => Object.fromEntries(estaciones.map((e) => [e, registros.filter((r) => r.estacion === e)])) as Record<Estacion, RegistroPlanilla[]>,
     [registros, estaciones],
@@ -250,7 +281,7 @@ export function RegistrosPlanillas({ registros, abribles, estaciones }: { regist
     <TablaEstacion
       estacion={e}
       registros={porEstacion[e]}
-      puedeAbrir={abribles.includes(e)}
+      abrible={(r) => abribles.includes(e) && (todas || estacionesAbribles.includes(r.estacion_trabajo.id))}
       seleccion={selecciones[e] ?? {}}
       setSeleccion={(fn) => setSelecciones((p) => ({ ...p, [e]: fn(p[e] ?? {}) }))}
     />
@@ -271,7 +302,7 @@ export function RegistrosPlanillas({ registros, abribles, estaciones }: { regist
                 e === activa ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
               }`}
             >
-              {ETIQUETA_ESTACION[e]} ({porEstacion[e].length})
+              {ETIQUETA_ESTACION[e]} ({e === "PVC" ? tandasDe(porEstacion[e]).size : porEstacion[e].length})
             </button>
           ))}
         </div>

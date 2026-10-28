@@ -32,6 +32,7 @@ export function ConfirmActionButton({
   variant = "outline",
   disabled,
   ariaLabel,
+  className,
 }: {
   label: ReactNode;
   title: string;
@@ -45,6 +46,8 @@ export function ConfirmActionButton({
   disabled?: boolean;
   /** Para botones que son solo un ícono. */
   ariaLabel?: string;
+  /** Clases extra del botón (ej. alto táctil de 44 px). */
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
@@ -76,7 +79,7 @@ export function ConfirmActionButton({
     >
       <DialogTrigger
         render={
-          <Button size="sm" variant={variant} disabled={disabled} aria-label={ariaLabel} title={ariaLabel}>
+          <Button size="sm" variant={variant} disabled={disabled} aria-label={ariaLabel} title={ariaLabel} className={className}>
             {label}
           </Button>
         }

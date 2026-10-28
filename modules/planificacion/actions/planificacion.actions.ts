@@ -31,7 +31,22 @@ export async function eliminarItemAction(id: string): Promise<PlanificacionResul
   return ejecutar(() => apiFetch(`/planificacion/items/${id}`, { method: "DELETE" }), "Error inesperado al quitar la fila.");
 }
 
-/** Marca o desmarca el estado de producción que técnica le asignó al usuario. */
-export async function marcarEstadoAction(id: string, marcado: boolean): Promise<PlanificacionResult> {
-  return ejecutar(() => apiFetch(`/planificacion/items/${id}/marca`, { method: "PUT", body: { marcado } }), "Error inesperado al marcar el estado.");
+/** Marca o desmarca un estado de producción de las estaciones de trabajo del usuario (`estadoId` es obligatorio con más de uno). */
+export async function marcarEstadoAction(id: string, marcado: boolean, estadoId: string): Promise<PlanificacionResult> {
+  return ejecutar(() => apiFetch(`/planificacion/items/${id}/marca`, { method: "PUT", body: { marcado, estado_id: estadoId } }), "Error inesperado al marcar el estado.");
+}
+
+/** Agrega una observación del usuario a una fila; queda firmada con su nombre. */
+export async function agregarObservacionAction(itemId: string, texto: string): Promise<PlanificacionResult> {
+  return ejecutar(() => apiFetch(`/planificacion/items/${itemId}/observaciones`, { method: "POST", body: { texto } }), "Error inesperado al agregar la observación.");
+}
+
+/** Edita una observación propia (el backend rechaza las ajenas con 403); el historial guarda cada versión. */
+export async function editarObservacionAction(id: string, texto: string): Promise<PlanificacionResult> {
+  return ejecutar(() => apiFetch(`/planificacion/observaciones/${id}`, { method: "PUT", body: { texto } }), "Error inesperado al guardar la observación.");
+}
+
+/** Borrado lógico: el autor borra la suya; técnica puede borrar cualquiera. Queda en el historial. */
+export async function eliminarObservacionAction(id: string): Promise<PlanificacionResult> {
+  return ejecutar(() => apiFetch(`/planificacion/observaciones/${id}`, { method: "DELETE" }), "Error inesperado al borrar la observación.");
 }

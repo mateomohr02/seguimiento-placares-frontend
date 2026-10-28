@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Seguimiento de placares",
-  description: "Seguimiento de piezas de placares cortadas en Rover.",
+  title: "Seguimiento productivo",
+  description: "Seguimiento de piezas de placares y cocinas cortadas en Rover.",
   robots: { index: false },
 };
 

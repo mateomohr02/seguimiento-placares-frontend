@@ -6,6 +6,7 @@ import { ModulosTable } from "@/modules/modulo/components/modulos-table";
 import type { Modulo } from "@/modules/modulo/types/modulo.types";
 import type { PedidoConOrden } from "@/modules/pedido/types/pedido.types";
 import { EstadoBadge } from "@/components/estado-badge";
+import { LineasBadges } from "@/components/linea-badge";
 import { PedidoNav } from "@/modules/pedido/components/pedido-nav";
 import { TIPOS_OBLIGATORIOS } from "@/modules/documento-pedido/types/documento-pedido.types";
 import { DocumentacionPedido } from "@/modules/documento-pedido/components/documentacion-pedido";
@@ -34,11 +35,12 @@ export default async function PedidoDetallePage({
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10">
       <div>
         <VolverLink href={`/ordenes/${pedido.orden.id}`}>Orden {pedido.orden.numeroOrdenCustom}</VolverLink>
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           <h1 className="text-xl font-semibold">
             Pedido {pedido.codigo_pedido} — {pedido.referencia}
           </h1>
           <EstadoBadge estado={pedido.estado} />
+          <LineasBadges lineas={pedido.lineas} />
         </div>
       </div>
 
@@ -65,6 +67,7 @@ export default async function PedidoDetallePage({
         pedidoId={id}
         codigoPedido={pedido.codigo_pedido}
         documentos={documentos}
+        lineas={pedido.lineas}
         puedeGestionar={puedeGestionar}
       />
 

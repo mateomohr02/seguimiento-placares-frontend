@@ -11,7 +11,7 @@ import { NavLinks, type NavGrupo } from "@/components/nav-links";
 function gruposDe(sesion: Sesion): NavGrupo[] {
   const grupos: NavGrupo[] = [{ titulo: null, links: [{ href: "/", label: "Órdenes", exacto: true }] }];
 
-  // Solo las planillas que técnica le asignó al usuario (en el orden del proceso).
+  // Solo los tipos de planilla de las estaciones de trabajo del usuario (en el orden del proceso); si está en varias estaciones con el mismo tipo, elige en cuál al entrar. Técnica y admin ven los tres.
   const planillas = [
     { href: "/planillas/lijado", label: "Lijado", estacion: "LIJADO" },
     { href: "/planillas/encolado", label: "Encolado", estacion: "ENCOLADO" },
@@ -30,6 +30,9 @@ function gruposDe(sesion: Sesion): NavGrupo[] {
   if (puede(sesion, PERMISOS.PLANILLAS_INDICADORES)) termolaminado.push({ href: "/planillas/indicadores", label: "Indicadores" });
   if (puede(sesion, PERMISOS.PLANILLAS_CONFIGURAR)) termolaminado.push({ href: "/planillas/configuracion", label: "Configurar" });
   if (termolaminado.length > 0) grupos.push({ titulo: "Termolaminado", links: termolaminado });
+
+  // Alta y baja de personas, PIN, rol y estaciones de trabajo (técnica / admin).
+  if (puede(sesion, PERMISOS.USUARIOS_GESTIONAR)) grupos.push({ titulo: null, links: [{ href: "/usuarios", label: "Usuarios" }] });
 
   return grupos;
 }

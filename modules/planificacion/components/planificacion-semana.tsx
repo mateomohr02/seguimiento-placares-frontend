@@ -10,6 +10,7 @@ import { colorDe, textoSobre } from "../lib/colores";
 import { eliminarItemAction, marcarEstadoAction } from "../actions/planificacion.actions";
 import { ETIQUETA_TIPO, type ItemPlanificacion, type SemanaPlanificacion, type TipoPlanificacion } from "../types/planificacion.types";
 import { ItemDialog } from "./item-dialog";
+import { ObservacionesCelda } from "./observaciones-celda";
 
 const DIA_MS = 86_400_000;
 const mas = (iso: string, dias: number) => new Date(new Date(`${iso}T00:00:00Z`).getTime() + dias * DIA_MS).toISOString().slice(0, 10);
@@ -17,10 +18,8 @@ const v = (x: string | null) => (x === null || x === "" ? "—" : x);
 const f = (x: string | null) => (x ? fechaCorta(x) : "—");
 const hora = new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" });
 
-// Estados marcados en una fila y, para quien tiene un estado asignado, el botón para marcarlo o quitarlo.
+// Estados marcados en una fila y, para quien está en estaciones con estado, un botón por cada estado que puede marcar o quitar.
 function Estados({ item, data }: { item: ItemPlanificacion; data: SemanaPlanificacion }) {
-  const mio = data.mi_estado;
-  const marcadoPorMi = mio ? item.marcas.some((m) => m.estado_id === mio.id) : false;
   return (
     <div className="flex flex-col items-start gap-1.5">
       {item.marcas.map((m) => (
@@ -36,21 +35,26 @@ function Estados({ item, data }: { item: ItemPlanificacion; data: SemanaPlanific
           </span>
         </div>
       ))}
-      {mio && (
-        <ConfirmActionButton
-          variant={marcadoPorMi ? "outline" : "default"}
-          label={marcadoPorMi ? "Quitar marca" : `Marcar «${mio.nombre}»`}
-          title={marcadoPorMi ? `¿Quitar «${mio.nombre}»?` : `¿Marcar «${mio.nombre}»?`}
-          description={
-            <>
-              {marcadoPorMi ? "Se quita la marca de" : "Se marca como"} «{mio.nombre}»: {item.n_tw || item.cliente}.
-            </>
-          }
-          successMessage={marcadoPorMi ? "Marca quitada." : "Estado marcado."}
-          errorTitle="No se pudo cambiar el estado"
-          run={() => marcarEstadoAction(item.id, !marcadoPorMi)}
-        />
-      )}
+      {data.mis_estados.map((mio) => {
+        const marcadoPorMi = item.marcas.some((m) => m.estado_id === mio.id);
+        const varios = data.mis_estados.length > 1;
+        return (
+          <ConfirmActionButton
+            key={mio.id}
+            variant={marcadoPorMi ? "outline" : "default"}
+            label={marcadoPorMi ? (varios ? `Quitar «${mio.nombre}»` : "Quitar marca") : `Marcar «${mio.nombre}»`}
+            title={marcadoPorMi ? `¿Quitar «${mio.nombre}»?` : `¿Marcar «${mio.nombre}»?`}
+            description={
+              <>
+                {marcadoPorMi ? "Se quita la marca de" : "Se marca como"} «{mio.nombre}»: {item.n_tw || item.cliente}.
+              </>
+            }
+            successMessage={marcadoPorMi ? "Marca quitada." : "Estado marcado."}
+            errorTitle="No se pudo cambiar el estado"
+            run={() => marcarEstadoAction(item.id, !marcadoPorMi, mio.id)}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -153,7 +157,9 @@ function Tabla({ tipo, data, puedeGestionar }: { tipo: TipoPlanificacion; data: 
                   <TableCell className="whitespace-nowrap">{v(i.color)}</TableCell>
                   {reclamos ? <TableCell className="whitespace-nowrap">{f(i.compromiso)}</TableCell> : <TableCell className="whitespace-nowrap">{f(i.fabrica)}</TableCell>}
                   {reclamos ? <TableCell className="whitespace-nowrap">{f(i.finalizado_en)}</TableCell> : <TableCell className="whitespace-nowrap">{f(i.fecha_limite)}</TableCell>}
-                  <TableCell className="min-w-32">{v(i.observaciones)}</TableCell>
+                  <TableCell className="min-w-56">
+                    <ObservacionesCelda item={i} />
+                  </TableCell>
                   {puedeGestionar && (
                     <TableCell>
                       <Acciones item={i} semana={data.semana_inicio} />
@@ -219,12 +225,22 @@ export function PlanificacionSemana({ data, puedeGestionar, semanaActual }: { da
       </div>
 
       <p className="text-sm text-muted-foreground">
-        {data.mi_estado ? (
+        {data.mis_estados.length === 0 ? (
+          "Ninguna de tus estaciones de trabajo tiene un estado de producción (o no estás en ninguna): podés ver la planificación pero no marcar. Pedile a técnica que te asigne a una estación con estado."
+        ) : data.mis_estados.length === 1 ? (
           <>
-            Tu estado de producción es <strong>«{data.mi_estado.nombre}»</strong>: marcalo en cada pedido cuando termine en tu estación.
+            El estado de producción de tu estación es <strong>«{data.mis_estados[0].nombre}»</strong>: marcalo en cada pedido cuando termine en tu estación.
           </>
         ) : (
-          "Técnica todavía no te asignó un estado de producción: podés ver la planificación pero no marcar."
+          <>
+            Tus estaciones marcan estos estados de producción: {data.mis_estados.map((e, i) => (
+              <span key={e.id}>
+                {i > 0 && ", "}
+                <strong>«{e.nombre}»</strong>
+              </span>
+            ))}
+            . En cada pedido elegí cuál marcar (un botón por estado).
+          </>
         )}
       </p>
 

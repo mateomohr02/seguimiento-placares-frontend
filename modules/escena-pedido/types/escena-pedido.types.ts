@@ -23,6 +23,8 @@ export interface CajaEscena {
   k?: string;
   /** Foto de paisaje (PSJ): la imagen entera cubre la cara y se ve sin sombras. */
   p?: 1;
+  /** Veta del tablero: eje local de la caja (0 = L, 1 = H, 2 = P) a lo largo del cual corre; sin dato, la textura se ve como siempre. */
+  v?: 0 | 1 | 2;
 }
 
 /** Malla de triángulos (cortinas, barandas, tubos…). */

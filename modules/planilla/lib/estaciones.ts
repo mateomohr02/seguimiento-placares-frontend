@@ -1,4 +1,4 @@
-import type { Estacion } from "../types/planilla.types";
+import type { Estacion, MesaTamano } from "../types/planilla.types";
 
 export const ESTACIONES: Estacion[] = ["LIJADO", "ENCOLADO", "PVC"];
 
@@ -11,6 +11,10 @@ export function estacionDeSlug(slug: string): Estacion | null {
   const e = slug.toUpperCase();
   return (ESTACIONES as string[]).includes(e) ? (e as Estacion) : null;
 }
+
+/** Ruta de la planilla de un tipo en una estación de trabajo (y, opcionalmente, de un día). */
+export const rutaPlanilla = (tipo: Estacion, estacionTrabajoId: string, fecha?: string) =>
+  `/planillas/${slugEstacion(tipo)}/${encodeURIComponent(estacionTrabajoId)}${fecha ? `?fecha=${fecha}` : ""}`;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -26,6 +30,13 @@ export const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 export function fechaCorta(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
+}
+
+/** "Grande ×3" / "Chica ×1"; "—" si falta el tamaño. */
+export function etiquetaMesa(tamano: MesaTamano | null | undefined, cantidad: number | null | undefined): string {
+  if (!tamano) return "—";
+  const t = tamano === "CHICA" ? "Chica" : "Grande";
+  return cantidad ? `${t} ×${cantidad}` : t;
 }
 
 export function formatoMinutos(min: number): string {

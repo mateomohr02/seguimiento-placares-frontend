@@ -16,16 +16,43 @@ const normalizar = (s: string) =>
     .replace(/\s+/g, " ");
 
 // Deduce el tipo a partir del título del reporte (ej. "LISTADO DE HERRAJES DE
-// PRODUCCIÓN PARA PLACARES", "LISTADO DE HERRAJES PRODUCCIÓN DE COCINAS").
+// PRODUCCIÓN PARA PLACARES", "LISTADO DE ACCESORIOS DE INSTALACIÓN DE COCINAS").
+// Se toma el título que aparece primero en el texto (no importa que otro aparezca
+// más abajo) y la línea (cocinas / placares) se busca junto a ese título, no en
+// toda la hoja: un cliente o una observación que diga "cocina" no cambia el tipo.
+// Si la línea es ambigua devuelve null (no se puede verificar, no se bloquea).
 export function tipoDesdeTexto(texto: string): TipoDocumento | null {
   const t = normalizar(texto);
-  const linea = t.includes("COCINA") ? "COCINAS" : t.includes("PLACAR") ? "PLACARES" : null;
-  if (t.includes("NOTA DE PEDIDO")) return "NOTA_PEDIDO";
-  if (t.includes("DETALLE DE REMISION")) return "DETALLE_REMISION";
-  if (t.includes("ESCANDALLO")) return "ESCANDALLO_PLACARES";
-  if (t.includes("HERRAJES") && linea) return linea === "PLACARES" ? "HERRAJES_PLACARES" : "HERRAJES_COCINAS";
-  if (t.includes("ACCESORIOS") && linea) return linea === "PLACARES" ? "ACCESORIOS_PLACARES" : "ACCESORIOS_COCINAS";
-  return null;
+  const candidatos = (["NOTA DE PEDIDO", "DETALLE DE REMISION", "ESCANDALLO", "HERRAJES", "ACCESORIOS"] as const)
+    .map((clave) => ({ clave, i: t.indexOf(clave) }))
+    .filter((c) => c.i >= 0)
+    .sort((a, b) => a.i - b.i);
+  const primero = candidatos[0];
+  if (!primero) return null;
+  switch (primero.clave) {
+    case "NOTA DE PEDIDO":
+      return "NOTA_PEDIDO";
+    case "DETALLE DE REMISION":
+      return "DETALLE_REMISION";
+    case "ESCANDALLO":
+      return "ESCANDALLO_PLACARES"; // el escandallo es solo de placares
+  }
+  // La mención más cercana al título (hasta 90 caracteres después); si no hay,
+  // vale la de toda la hoja solo cuando es inequívoca.
+  const cerca = /COCINA|PLACAR/.exec(t.slice(Math.max(0, primero.i - 30), primero.i + 90));
+  const linea = cerca ? (cerca[0] === "COCINA" ? "COCINAS" : "PLACARES") : lineaEn(t);
+  if (!linea) return null;
+  const placares = linea === "PLACARES";
+  return primero.clave === "HERRAJES"
+    ? placares ? "HERRAJES_PLACARES" : "HERRAJES_COCINAS"
+    : placares ? "ACCESORIOS_PLACARES" : "ACCESORIOS_COCINAS";
+}
+
+// Línea mencionada en un texto; null si no aparece ninguna o aparecen ambas.
+function lineaEn(t: string): "PLACARES" | "COCINAS" | null {
+  const c = t.includes("COCINA");
+  const p = t.includes("PLACAR");
+  return c === p ? null : c ? "COCINAS" : "PLACARES";
 }
 
 // Lee el texto de la primera hoja (los PDFs de TeoWin tienen capa de texto).

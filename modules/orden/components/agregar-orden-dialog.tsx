@@ -60,7 +60,7 @@ export function AgregarOrdenDialog() {
           <DialogHeader>
             <DialogTitle>Agregar orden</DialogTitle>
             <DialogDescription>
-              Sincroniza los pedidos, módulos y piezas de placar de una orden de fabricación desde
+              Sincroniza los pedidos, módulos y piezas (placares y cocinas) de una orden de fabricación desde
               TeoWin (solo lectura).
             </DialogDescription>
           </DialogHeader>

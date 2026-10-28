@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { SearchIcon } from "lucide-react";
+import { LineasBadges } from "@/components/linea-badge";
 import { EstadoBadge } from "@/components/estado-badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { LINEA_LABEL, type Linea } from "@/lib/linea";
 import type { Orden } from "../types/orden.types";
 import { OrdenAcciones } from "./orden-acciones";
 
@@ -29,10 +31,13 @@ const normalize = (s: string) =>
 export function OrdenesTable({
   ordenes,
   archivadas,
+  linea,
   puedeGestionar,
 }: {
   ordenes: Orden[];
   archivadas: boolean;
+  /** Filtro de línea activo (solo para el mensaje de lista vacía). */
+  linea?: Linea;
   /** Archivar / eliminar órdenes (permiso ordenes.gestionar). */
   puedeGestionar: boolean;
 }) {
@@ -57,7 +62,9 @@ export function OrdenesTable({
   if (ordenes.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        {archivadas
+        {linea
+          ? `No hay órdenes ${archivadas ? "archivadas " : "activas "}de ${LINEA_LABEL[linea].toLowerCase()}.`
+          : archivadas
           ? "No hay órdenes archivadas."
           : puedeGestionar
             ? 'No hay órdenes activas. Usá "Agregar orden" para sincronizar una desde TeoWin (o revisá las archivadas).'
@@ -112,6 +119,9 @@ export function OrdenesTable({
                 <Link href={`/ordenes/${orden.id}`} className="hover:underline">
                   {orden.descripcion}
                 </Link>
+                <div className="mt-1">
+                  <LineasBadges lineas={orden.lineas} />
+                </div>
                 {pedidosCoincidentes(orden).length > 0 && (
                   <p className="text-xs text-muted-foreground">
                     Pedido {pedidosCoincidentes(orden).slice(0, 3).join(", ")}
