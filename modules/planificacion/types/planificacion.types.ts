@@ -1,5 +1,9 @@
-// Planificación semanal de Termolaminado cargada por sistema (diseño.md §14.4).
+// Planificación semanal por estación de trabajo (plantilla TERMOLAMINADO) cargada por sistema (diseño.md §14.4).
 export type TipoPlanificacion = "PEDIDOS" | "RECLAMOS";
+
+/** Plantillas de planificación que puede elegir una estación de trabajo (hoy solo una). */
+export type PlantillaPlanificacion = "TERMOLAMINADO";
+export const ETIQUETA_PLANTILLA: Record<PlantillaPlanificacion, string> = { TERMOLAMINADO: "Termolaminado" };
 
 export const ETIQUETA_TIPO: Record<TipoPlanificacion, string> = {
   PEDIDOS: "Pedidos",
@@ -43,19 +47,23 @@ export interface ItemPlanificacion {
   tipo: TipoPlanificacion;
   /** Lunes de la semana (AAAA-MM-DD). */
   semana_inicio: string;
-  cliente: string;
-  n_tw: string;
+  /** Pedido cargado en la app al que apunta la fila (de ahí salen N° TW, N° orden y cliente). */
+  pedido_id: string | null;
+  orden_id: string | null;
+  /** N° TW = código del pedido. */
+  codigo_pedido: string;
   n_orden: string | null;
+  /** Cliente = referencia del pedido. */
+  cliente: string | null;
   modelo: string | null;
   color: string | null;
-  fabrica: string | null;
-  fecha_limite: string | null;
+  compromiso: string | null;
+  finalizado_en: string | null;
   distribuidor: string | null;
   ticket: string | null;
   tipo_reclamo: string | null;
-  compromiso: string | null;
-  finalizado_en: string | null;
   observaciones: string | null;
+  orden: number;
   marcas: MarcaPlanificacion[];
   comentarios: ObservacionPlanificacion[];
 }
@@ -66,7 +74,14 @@ export interface EstadoBasico {
   color: string | null;
 }
 
+export interface EstacionPlanificacion {
+  id: string;
+  nombre: string;
+  plantilla: PlantillaPlanificacion;
+}
+
 export interface SemanaPlanificacion {
+  estacion: EstacionPlanificacion;
   semana_inicio: string;
   semanas: string[];
   estados: EstadoBasico[];
@@ -75,21 +90,35 @@ export interface SemanaPlanificacion {
   items: ItemPlanificacion[];
 }
 
-/** Lo que se manda al crear o editar una fila (los vacíos llegan como cadena vacía). */
+/** Lo que se manda al crear o editar una fila (los vacíos llegan como cadena vacía). El resto se deriva del pedido. */
 export interface ItemInput {
+  estacion_id: string;
   tipo: TipoPlanificacion;
   semana: string;
-  cliente: string;
-  n_tw: string;
-  n_orden: string;
+  pedido_id: string;
   modelo: string;
   color: string;
-  fabrica: string;
-  fecha_limite: string;
+  compromiso: string;
+  finalizado_en: string;
   distribuidor: string;
   ticket: string;
   tipo_reclamo: string;
-  compromiso: string;
-  finalizado_en: string;
   observaciones: string;
+}
+
+/** Resultado de GET /planificacion/pedidos (lista del diálogo de fila). */
+export interface PedidoElegible {
+  pedido_id: string;
+  codigo_pedido: string;
+  referencia: string | null;
+  orden_id: string | null;
+  n_orden: string | null;
+}
+
+/** Resultado de GET /planificacion/buscar (buscador de la planificación). */
+export interface ResultadoBusqueda {
+  item_id: string;
+  semana_inicio: string;
+  tipo: TipoPlanificacion;
+  codigo_pedido: string;
 }
