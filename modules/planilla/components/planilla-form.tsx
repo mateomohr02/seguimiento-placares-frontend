@@ -3,20 +3,28 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2Icon, CheckIcon, ClockIcon, LockIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { CheckCircle2Icon, CheckIcon, ClockIcon, LockIcon, PlusIcon, Trash2Icon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingDots } from "@/components/loading-dots";
 import { ETIQUETA_ESTACION, fechaCorta, rutaPlanilla } from "../lib/estaciones";
-import type { Estacion, EstadoPlanilla, FotoFila, OperarioDisponible, OperarioPlanilla, Planilla } from "../types/planilla.types";
+import type { Estacion, EstadoPlanilla, FotoFila, MesaTamano, OperarioDisponible, OperarioPlanilla, Planilla } from "../types/planilla.types";
 import { FotosFila, subirFoto, type FotoPendiente } from "./fotos-fila";
 
 // Formulario de una planilla de producción (Lijado, Encolado o PVC) de un día. Mientras
 // es BORRADOR se guarda sola en el servidor (así no se pierde si se cierra la sesión);
 // "Guardar planilla" la cierra, y una planilla guardada se puede corregir (el servidor
 // conserva la versión previa). Diseño.md §14.
+
+/** Pedido de una tanda de PVC: código y piezas de ese pedido que entraron en la tanda. */
+interface PedidoForm {
+  key: string;
+  id?: string;
+  pedido_codigo: string;
+  cantidad_piezas: string;
+}
 
 interface FilaForm {
   key: string;
@@ -29,18 +37,23 @@ interface FilaForm {
   colocacion_pvc: string;
   perfilado: string;
   colores: string;
-  mesa_chica: string;
-  mesa_grande: string;
+  /** PVC: tamaño y cantidad de mesas de la tanda, y sus pedidos. */
+  mesa_tamano: MesaTamano | "";
+  mesa_cantidad: string;
+  pedidos: PedidoForm[];
   fotos: FotoFila[];
   /** Fotos de un ítem que todavía no existe en el servidor: se suben solas al guardar. */
   pendientes: FotoPendiente[];
 }
 
-type CampoTexto = Exclude<keyof FilaForm, "key" | "id" | "fotos" | "pendientes">;
+type CampoTexto = Exclude<keyof FilaForm, "key" | "id" | "fotos" | "pendientes" | "pedidos" | "mesa_tamano">;
 
 const AUTOSAVE_MS = 1200;
 let contadorKey = 0;
 const nuevaKey = () => `f${++contadorKey}`;
+const MAX_PEDIDOS = 30;
+
+const pedidoVacio = (): PedidoForm => ({ key: nuevaKey(), pedido_codigo: "", cantidad_piezas: "" });
 
 const vacia = (): FilaForm => ({
   key: nuevaKey(),
@@ -52,8 +65,9 @@ const vacia = (): FilaForm => ({
   colocacion_pvc: "",
   perfilado: "",
   colores: "",
-  mesa_chica: "",
-  mesa_grande: "",
+  mesa_tamano: "",
+  mesa_cantidad: "",
+  pedidos: [pedidoVacio()],
   fotos: [],
   pendientes: [],
 });
@@ -70,8 +84,12 @@ const desdeServidor = (p: Planilla): FilaForm[] =>
     colocacion_pvc: f.colocacion_pvc ?? "",
     perfilado: f.perfilado ?? "",
     colores: f.colores ?? "",
-    mesa_chica: f.mesa_chica === null ? "" : String(f.mesa_chica),
-    mesa_grande: f.mesa_grande === null ? "" : String(f.mesa_grande),
+    mesa_tamano: f.mesa_tamano ?? "",
+    mesa_cantidad: f.mesa_cantidad === null || f.mesa_cantidad === undefined ? "" : String(f.mesa_cantidad),
+    pedidos:
+      f.pedidos?.length > 0
+        ? f.pedidos.map((x) => ({ key: nuevaKey(), id: x.id, pedido_codigo: x.pedido_codigo, cantidad_piezas: String(x.cantidad_piezas) }))
+        : [pedidoVacio()],
     fotos: f.fotos,
     pendientes: [],
   }));
@@ -79,7 +97,8 @@ const desdeServidor = (p: Planilla): FilaForm[] =>
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
 
 // `operarios` son los ids de usuario de las personas elegidas (los nombres viejos sin usuario no se mandan: el servidor los conserva).
-const hacerBody = (estado: EstadoPlanilla, operarios: string[], filas: FilaForm[]) => ({
+// En PVC cada fila es una tanda de mesas (con sus pedidos; el servidor descarta los pedidos totalmente vacíos); en Lijado y Encolado, un pedido.
+const hacerBody = (estado: EstadoPlanilla, operarios: string[], filas: FilaForm[], pvc: boolean) => ({
   estado,
   operarios,
   filas: filas.map((f) => ({
@@ -87,14 +106,17 @@ const hacerBody = (estado: EstadoPlanilla, operarios: string[], filas: FilaForm[
     // Una hora a medio escribir no se manda (queda vacía) hasta que esté completa.
     hora_inicio: HORA_VALIDA.test(f.hora_inicio) ? f.hora_inicio : "",
     hora_fin: HORA_VALIDA.test(f.hora_fin) ? f.hora_fin : "",
-    pedido_codigo: f.pedido_codigo,
-    cantidad_piezas: num(f.cantidad_piezas),
     observaciones: f.observaciones,
-    colocacion_pvc: f.colocacion_pvc,
-    perfilado: f.perfilado,
-    colores: f.colores,
-    mesa_chica: num(f.mesa_chica),
-    mesa_grande: num(f.mesa_grande),
+    ...(pvc
+      ? {
+          mesa_tamano: f.mesa_tamano || null,
+          mesa_cantidad: num(f.mesa_cantidad),
+          colores: f.colores,
+          colocacion_pvc: f.colocacion_pvc,
+          perfilado: f.perfilado,
+          pedidos: f.pedidos.map((p) => ({ id: p.id, pedido_codigo: p.pedido_codigo, cantidad_piezas: num(p.cantidad_piezas) })),
+        }
+      : { pedido_codigo: f.pedido_codigo, cantidad_piezas: num(f.cantidad_piezas) }),
   })),
 });
 
@@ -197,7 +219,7 @@ export function PlanillaForm({
           const res = await fetch(`/planillas-api/dia/${encodeURIComponent(estacionTrabajoId)}/${estacion}/${fecha}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(hacerBody(destino, idsDe(operariosRef.current), enviadas)),
+            body: JSON.stringify(hacerBody(destino, idsDe(operariosRef.current), enviadas, estacion === "PVC")),
           });
           const body = (await res.json().catch(() => null)) as { data?: Planilla; message?: string } | null;
           if (!res.ok || !body?.data) {
@@ -274,9 +296,8 @@ export function PlanillaForm({
     editar((prev) => prev.map((f) => (f.key === key ? { ...f, [campo]: valor } : f)));
   }
 
-  function onPedido(key: string, valor: string) {
-    const v = valor.toUpperCase();
-    setCampo(key, "pedido_codigo", v);
+  // Busca sugerencias de N° de pedido mientras se escribe (el valor ya viene en mayúsculas).
+  function sugerirPedido(v: string) {
     if (sugerirTimer.current) clearTimeout(sugerirTimer.current);
     if (v.trim().length < 2) return setSugerencias([]);
     sugerirTimer.current = setTimeout(async () => {
@@ -290,9 +311,34 @@ export function PlanillaForm({
     }, 250);
   }
 
+  function onPedido(key: string, valor: string) {
+    const v = valor.toUpperCase();
+    setCampo(key, "pedido_codigo", v);
+    sugerirPedido(v);
+  }
+
+  function setPedido(key: string, pkey: string, campo: "pedido_codigo" | "cantidad_piezas", valor: string) {
+    editar((prev) => prev.map((f) => (f.key === key ? { ...f, pedidos: f.pedidos.map((p) => (p.key === pkey ? { ...p, [campo]: valor } : p)) } : f)));
+    if (campo === "pedido_codigo") sugerirPedido(valor);
+  }
+
+  function agregarPedido(key: string) {
+    editar((prev) => prev.map((f) => (f.key === key && f.pedidos.length < MAX_PEDIDOS ? { ...f, pedidos: [...f.pedidos, pedidoVacio()] } : f)));
+  }
+
+  function quitarPedido(key: string, pkey: string) {
+    editar((prev) =>
+      prev.map((f) => {
+        if (f.key !== key) return f;
+        const resto = f.pedidos.filter((p) => p.key !== pkey);
+        return { ...f, pedidos: resto.length > 0 ? resto : [pedidoVacio()] };
+      }),
+    );
+  }
+
   function quitar(f: FilaForm) {
     const nFotos = f.fotos.length + f.pendientes.length;
-    if (nFotos > 0 && !window.confirm(`Este ítem tiene ${nFotos} foto(s). Si lo quitás dejan de verse en la planilla (en las que ya se subieron, queda copia en el historial). ¿Quitarlo?`)) return;
+    if (nFotos > 0 && !window.confirm(`Este ${esPvc ? "grupo de mesas" : "ítem"} tiene ${nFotos} foto(s). Si lo quitás dejan de verse en la planilla (en las que ya se subieron, queda copia en el historial). ¿Quitarlo?`)) return;
     f.pendientes.forEach((p) => URL.revokeObjectURL(p.url));
     editar((prev) => (prev.length > 1 ? prev.filter((x) => x.key !== f.key) : [vacia()]));
   }
@@ -338,10 +384,15 @@ export function PlanillaForm({
     setFilas((prev) => prev.map((f) => (f.key === key ? { ...f, fotos } : f)));
   }
 
-  const total = filas.reduce((s, f) => {
-    const n = esPvc ? (num(f.mesa_chica) ?? 0) + (num(f.mesa_grande) ?? 0) : (num(f.cantidad_piezas) ?? 0);
-    return s + (Number.isFinite(n) ? n : 0);
-  }, 0);
+  const entero = (s: string) => {
+    const n = num(s) ?? 0;
+    return Number.isFinite(n) ? n : 0;
+  };
+  const piezasTanda = (f: FilaForm) => f.pedidos.reduce((s, p) => s + entero(p.cantidad_piezas), 0);
+  // Totales del día. En PVC: mesas chicas, mesas grandes y piezas (suma de los pedidos de todas las tandas).
+  const total = filas.reduce((s, f) => s + (esPvc ? piezasTanda(f) : entero(f.cantidad_piezas)), 0);
+  const mesasChicas = filas.reduce((s, f) => s + (f.mesa_tamano === "CHICA" ? entero(f.mesa_cantidad) : 0), 0);
+  const mesasGrandes = filas.reduce((s, f) => s + (f.mesa_tamano === "GRANDE" ? entero(f.mesa_cantidad) : 0), 0);
   const guardada = estado === "GUARDADA";
   // Los nombres viejos sin usuario (planillas anteriores a esta función) quedan como historia: se ven, no se tocan.
   const historicos = operarios.filter((o) => o.usuario_id === null);
@@ -473,44 +524,132 @@ export function PlanillaForm({
         ))}
       </datalist>
 
+      {esPvc && (
+        <dl className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/40 p-3 text-center" aria-label="Totales del día">
+          <div className="flex flex-col">
+            <dt className="text-xs text-muted-foreground">Mesas chicas</dt>
+            <dd className="text-2xl font-semibold tabular-nums">{mesasChicas}</dd>
+          </div>
+          <div className="flex flex-col">
+            <dt className="text-xs text-muted-foreground">Mesas grandes</dt>
+            <dd className="text-2xl font-semibold tabular-nums">{mesasGrandes}</dd>
+          </div>
+          <div className="flex flex-col">
+            <dt className="text-xs text-muted-foreground">Piezas</dt>
+            <dd className="text-2xl font-semibold tabular-nums">{total}</dd>
+          </div>
+        </dl>
+      )}
+
       <ol className="flex flex-col gap-3">
         {filas.map((f, i) => (
           <li key={f.key} className="flex flex-col gap-3 rounded-lg border bg-background p-4">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold">Ítem {i + 1}</span>
-              <Button type="button" variant="ghost" size="sm" className="h-9" onClick={() => quitar(f)} aria-label={`Quitar ítem ${i + 1}`}>
+              <span className="text-sm font-semibold">
+                {esPvc ? "Tanda de mesas" : "Ítem"} {i + 1}
+                {esPvc && <span className="ml-2 font-normal text-muted-foreground">· {piezasTanda(f)} pieza{piezasTanda(f) === 1 ? "" : "s"}</span>}
+              </span>
+              <Button type="button" variant="ghost" size="sm" className="h-11 lg:h-9" onClick={() => quitar(f)} aria-label={`Quitar ${esPvc ? "tanda" : "ítem"} ${i + 1}`}>
                 <Trash2Icon /> Quitar
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-              <Campo etiqueta="N° de pedido" className="col-span-2 lg:col-span-2">
-                <Input
-                  value={f.pedido_codigo}
-                  onChange={(e) => onPedido(f.key, e.target.value)}
-                  list="sugerencias-pedidos"
-                  maxLength={40}
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  placeholder="Ej. 26-02689"
-                  className="h-11"
-                />
-              </Campo>
-              <Campo etiqueta="Hora inicio">
-                <HoraInput valor={f.hora_inicio} onChange={(v) => setCampo(f.key, "hora_inicio", v)} />
-              </Campo>
-              <Campo etiqueta="Hora fin">
-                <HoraInput valor={f.hora_fin} onChange={(v) => setCampo(f.key, "hora_fin", v)} />
-              </Campo>
-              {esPvc ? (
-                <>
-                  <Campo etiqueta="Mesa chica">
-                    <NumeroInput valor={f.mesa_chica} onChange={(v) => setCampo(f.key, "mesa_chica", v)} />
+            {esPvc ? (
+              <>
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <Campo etiqueta="Hora inicio">
+                    <HoraInput valor={f.hora_inicio} onChange={(v) => setCampo(f.key, "hora_inicio", v)} />
                   </Campo>
-                  <Campo etiqueta="Mesa grande">
-                    <NumeroInput valor={f.mesa_grande} onChange={(v) => setCampo(f.key, "mesa_grande", v)} />
+                  <Campo etiqueta="Hora fin">
+                    <HoraInput valor={f.hora_fin} onChange={(v) => setCampo(f.key, "hora_fin", v)} />
                   </Campo>
-                  <Campo etiqueta="Colores (código)" className="col-span-2 lg:col-span-2">
+                </div>
+
+                <div className="flex flex-col gap-1 text-sm">
+                  <span id={`${f.key}-mesa`} className="font-medium">
+                    Mesas armadas
+                  </span>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div role="radiogroup" aria-labelledby={`${f.key}-mesa`} className="flex gap-2">
+                      {(["CHICA", "GRANDE"] as const).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          role="radio"
+                          aria-checked={f.mesa_tamano === t}
+                          onClick={() => editar((prev) => prev.map((x) => (x.key === f.key ? { ...x, mesa_tamano: t } : x)))}
+                          className={`inline-flex h-12 min-w-32 items-center justify-center rounded-lg border px-5 text-base font-medium transition active:scale-[0.98] ${
+                            f.mesa_tamano === t ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
+                          }`}
+                        >
+                          {f.mesa_tamano === t && <CheckIcon className="mr-1.5 size-4" aria-hidden />}
+                          {t === "CHICA" ? "Mesa chica" : "Mesa grande"}
+                        </button>
+                      ))}
+                    </div>
+                    <label className="flex items-center gap-2">
+                      <span className="font-medium">Cantidad</span>
+                      <Input
+                        value={f.mesa_cantidad}
+                        onChange={(e) => setCampo(f.key, "mesa_cantidad", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        inputMode="numeric"
+                        autoComplete="off"
+                        aria-label="Cantidad de mesas"
+                        placeholder="Ej. 3"
+                        className="h-12 w-24 text-center text-lg font-medium tabular-nums"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-md border bg-muted/20 p-3">
+                  <span className="text-sm font-medium">Pedidos de la tanda (piezas de cada pedido en esta tanda)</span>
+                  <ul className="flex flex-col gap-2">
+                    {f.pedidos.map((p, j) => (
+                      <li key={p.key} className="grid grid-cols-[1fr_6rem_auto] items-end gap-2">
+                        <Campo etiqueta={j === 0 ? "N° de pedido" : `N° de pedido ${j + 1}`}>
+                          <Input
+                            value={p.pedido_codigo}
+                            onChange={(e) => setPedido(f.key, p.key, "pedido_codigo", e.target.value.replace(/\s/g, "").toUpperCase())}
+                            onKeyDown={(e) => {
+                              if (e.key === " ") e.preventDefault();
+                            }}
+                            list="sugerencias-pedidos"
+                            maxLength={40}
+                            autoComplete="off"
+                            autoCapitalize="characters"
+                            placeholder="Ej. 26-02689"
+                            className="h-11"
+                          />
+                        </Campo>
+                        <Campo etiqueta="Piezas">
+                          <NumeroInput valor={p.cantidad_piezas} onChange={(v) => setPedido(f.key, p.key, "cantidad_piezas", v)} />
+                        </Campo>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="size-11 p-0"
+                          onClick={() => quitarPedido(f.key, p.key)}
+                          aria-label={`Quitar pedido ${j + 1} de la tanda ${i + 1}`}
+                          title="Quitar pedido"
+                        >
+                          <XIcon />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Button type="button" variant="outline" className="h-11 px-4" disabled={f.pedidos.length >= MAX_PEDIDOS} onClick={() => agregarPedido(f.key)}>
+                      <PlusIcon /> Agregar pedido
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Total de la tanda: <strong className="text-foreground">{piezasTanda(f)}</strong> pieza{piezasTanda(f) === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+                  <Campo etiqueta="Color (código)" className="col-span-2 lg:col-span-2">
                     <Input
                       value={f.colores}
                       onChange={(e) => setCampo(f.key, "colores", e.target.value.toUpperCase().replace(/\./g, ""))}
@@ -523,49 +662,52 @@ export function PlanillaForm({
                     />
                   </Campo>
                   <Campo etiqueta="Colocación PVC" className="col-span-2 lg:col-span-2">
-                    <Input
-                      value={f.colocacion_pvc}
-                      onChange={(e) => setCampo(f.key, "colocacion_pvc", e.target.value)}
-                      maxLength={200}
-                      autoComplete="off"
-                      className="h-11"
-                    />
+                    <Input value={f.colocacion_pvc} onChange={(e) => setCampo(f.key, "colocacion_pvc", e.target.value)} maxLength={200} autoComplete="off" className="h-11" />
                   </Campo>
                   <Campo etiqueta="Corte y perfilado" className="col-span-2 lg:col-span-2">
-                    <Input
-                      value={f.perfilado}
-                      onChange={(e) => setCampo(f.key, "perfilado", e.target.value)}
-                      maxLength={200}
-                      autoComplete="off"
-                      className="h-11"
-                    />
+                    <Input value={f.perfilado} onChange={(e) => setCampo(f.key, "perfilado", e.target.value)} maxLength={200} autoComplete="off" className="h-11" />
                   </Campo>
-                </>
-              ) : (
+                  <Campo etiqueta="Observaciones" className="col-span-2 lg:col-span-6">
+                    <Input value={f.observaciones} onChange={(e) => setCampo(f.key, "observaciones", e.target.value)} maxLength={500} autoComplete="off" className="h-11" />
+                  </Campo>
+                </div>
+
+                <FotosFila
+                  filaId={f.id}
+                  fotos={f.fotos}
+                  pendientes={f.pendientes}
+                  onCambio={(fotos) => setFotos(f.key, fotos)}
+                  onAgregarPendientes={(items) => agregarPendientes(f.key, items)}
+                  onQuitarPendiente={(id) => quitarPendiente(f.key, id)}
+                />
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+                <Campo etiqueta="N° de pedido" className="col-span-2 lg:col-span-2">
+                  <Input
+                    value={f.pedido_codigo}
+                    onChange={(e) => onPedido(f.key, e.target.value)}
+                    list="sugerencias-pedidos"
+                    maxLength={40}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    placeholder="Ej. 26-02689"
+                    className="h-11"
+                  />
+                </Campo>
+                <Campo etiqueta="Hora inicio">
+                  <HoraInput valor={f.hora_inicio} onChange={(v) => setCampo(f.key, "hora_inicio", v)} />
+                </Campo>
+                <Campo etiqueta="Hora fin">
+                  <HoraInput valor={f.hora_fin} onChange={(v) => setCampo(f.key, "hora_fin", v)} />
+                </Campo>
                 <Campo etiqueta="Cantidad de piezas" className="col-span-2 lg:col-span-2">
                   <NumeroInput valor={f.cantidad_piezas} onChange={(v) => setCampo(f.key, "cantidad_piezas", v)} />
                 </Campo>
-              )}
-              <Campo etiqueta="Observaciones" className="col-span-2 lg:col-span-6">
-                <Input
-                  value={f.observaciones}
-                  onChange={(e) => setCampo(f.key, "observaciones", e.target.value)}
-                  maxLength={500}
-                  autoComplete="off"
-                  className="h-11"
-                />
-              </Campo>
-            </div>
-
-            {esPvc && (
-              <FotosFila
-                filaId={f.id}
-                fotos={f.fotos}
-                pendientes={f.pendientes}
-                onCambio={(fotos) => setFotos(f.key, fotos)}
-                onAgregarPendientes={(items) => agregarPendientes(f.key, items)}
-                onQuitarPendiente={(id) => quitarPendiente(f.key, id)}
-              />
+                <Campo etiqueta="Observaciones" className="col-span-2 lg:col-span-6">
+                  <Input value={f.observaciones} onChange={(e) => setCampo(f.key, "observaciones", e.target.value)} maxLength={500} autoComplete="off" className="h-11" />
+                </Campo>
+              </div>
             )}
           </li>
         ))}
@@ -573,10 +715,18 @@ export function PlanillaForm({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button type="button" variant="outline" className="h-11 px-4" onClick={() => editar((prev) => [...prev, vacia()])}>
-          <PlusIcon /> Agregar ítem
+          <PlusIcon /> {esPvc ? "Agregar tanda de mesas" : "Agregar ítem"}
         </Button>
         <span className="text-sm text-muted-foreground">
-          {filas.length} ítem{filas.length === 1 ? "" : "s"} · {total} pieza{total === 1 ? "" : "s"}
+          {esPvc ? (
+            <>
+              {filas.length} tanda{filas.length === 1 ? "" : "s"} · {mesasChicas + mesasGrandes} mesa{mesasChicas + mesasGrandes === 1 ? "" : "s"} · {total} pieza{total === 1 ? "" : "s"}
+            </>
+          ) : (
+            <>
+              {filas.length} ítem{filas.length === 1 ? "" : "s"} · {total} pieza{total === 1 ? "" : "s"}
+            </>
+          )}
         </span>
       </div>
 

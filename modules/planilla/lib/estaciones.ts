@@ -1,4 +1,4 @@
-import type { Estacion } from "../types/planilla.types";
+import type { Estacion, MesaTamano } from "../types/planilla.types";
 
 export const ESTACIONES: Estacion[] = ["LIJADO", "ENCOLADO", "PVC"];
 
@@ -30,6 +30,13 @@ export const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 export function fechaCorta(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
+}
+
+/** "Grande ×3" / "Chica ×1"; "—" si falta el tamaño. */
+export function etiquetaMesa(tamano: MesaTamano | null | undefined, cantidad: number | null | undefined): string {
+  if (!tamano) return "—";
+  const t = tamano === "CHICA" ? "Chica" : "Grande";
+  return cantidad ? `${t} ×${cantidad}` : t;
 }
 
 export function formatoMinutos(min: number): string {
