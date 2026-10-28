@@ -72,7 +72,7 @@ app/frontend/
 │   ├── planilla/                  # Planillas de Termolaminado: formulario con borrador automático (planilla-form.tsx), fotos de PVC (fotos-fila.tsx), operarios, filtros, tipos
 │   ├── usuario/                   # Usuarios (personas): listado con filtros y PIN visible/oculto (usuarios-lista.tsx), alta/edición/cambio de PIN (usuario-dialog.tsx), server actions y tipos
 │   ├── estacion-trabajo/          # Estaciones de trabajo (termolaminado1, mecanizado1…): listado (estaciones-config.tsx), alta/edición con planillas, estado y operarios (estacion-dialog.tsx), server actions y tipos
-│   ├── planificacion/             # Planificación semanal: tabla, diálogo de carga, marcado de estados (server actions) y tipos
+│   ├── planificacion/             # Planificación semanal: tabla, diálogo de carga, marcado de estados y observaciones de los usuarios con historial (server actions) y tipos
 │   └── auth/                       # Login por PIN: acción de login/logout y pantalla con teclado numérico
 ├── components/
 │   ├── barra-navegacion.tsx       # Barra superior global (en el layout, con sesión): enlaces según permisos + usuario; nav-links.tsx resalta la página actual. Alto fijo `--barra-h` (globals.css): las pantallas completas (visores, escaneo) lo descuentan
