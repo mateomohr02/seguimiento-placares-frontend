@@ -10,6 +10,7 @@ import { colorDe, textoSobre } from "../lib/colores";
 import { eliminarItemAction, marcarEstadoAction } from "../actions/planificacion.actions";
 import { ETIQUETA_TIPO, type ItemPlanificacion, type SemanaPlanificacion, type TipoPlanificacion } from "../types/planificacion.types";
 import { ItemDialog } from "./item-dialog";
+import { ObservacionesCelda } from "./observaciones-celda";
 
 const DIA_MS = 86_400_000;
 const mas = (iso: string, dias: number) => new Date(new Date(`${iso}T00:00:00Z`).getTime() + dias * DIA_MS).toISOString().slice(0, 10);
@@ -156,7 +157,9 @@ function Tabla({ tipo, data, puedeGestionar }: { tipo: TipoPlanificacion; data: 
                   <TableCell className="whitespace-nowrap">{v(i.color)}</TableCell>
                   {reclamos ? <TableCell className="whitespace-nowrap">{f(i.compromiso)}</TableCell> : <TableCell className="whitespace-nowrap">{f(i.fabrica)}</TableCell>}
                   {reclamos ? <TableCell className="whitespace-nowrap">{f(i.finalizado_en)}</TableCell> : <TableCell className="whitespace-nowrap">{f(i.fecha_limite)}</TableCell>}
-                  <TableCell className="min-w-32">{v(i.observaciones)}</TableCell>
+                  <TableCell className="min-w-56">
+                    <ObservacionesCelda item={i} />
+                  </TableCell>
                   {puedeGestionar && (
                     <TableCell>
                       <Acciones item={i} semana={data.semana_inicio} />
