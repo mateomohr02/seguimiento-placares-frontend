@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { SearchIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { fechaCorta } from "@/modules/planilla/lib/estaciones";
-import { ETIQUETA_TIPO, type ResultadoBusqueda } from "../types/planificacion.types";
+import type { PlantillaPlanificacion, ResultadoBusqueda } from "../types/planificacion.types";
 
-// Buscador por N° de pedido dentro de la planificación de la estación: al elegir un resultado navega a su semana y resalta la fila.
+const NOMBRES_DIA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const diaIdx = (iso: string) => (new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7;
+
+// Buscador por N° TW dentro de la planificación elegida: al elegir un resultado navega a su semana y resalta la fila.
 // Con el campo vacío no hace nada.
-export function BuscadorPedido({ estacionId }: { estacionId: string }) {
+export function BuscadorPedido({ plantilla }: { plantilla: PlantillaPlanificacion }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [resultados, setResultados] = useState<ResultadoBusqueda[] | null>(null);
@@ -23,7 +26,7 @@ export function BuscadorPedido({ estacionId }: { estacionId: string }) {
     const ctl = new AbortController();
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/planificacion-api/buscar?estacion=${encodeURIComponent(estacionId)}&q=${encodeURIComponent(texto)}`, { signal: ctl.signal });
+        const res = await fetch(`/planificacion-api/buscar?plantilla=${encodeURIComponent(plantilla)}&q=${encodeURIComponent(texto)}`, { signal: ctl.signal });
         const json = (await res.json().catch(() => null)) as { data?: ResultadoBusqueda[]; message?: string } | null;
         if (!res.ok) {
           setError(json?.message ?? "No se pudo buscar.");
@@ -40,7 +43,7 @@ export function BuscadorPedido({ estacionId }: { estacionId: string }) {
       clearTimeout(t);
       ctl.abort();
     };
-  }, [q, estacionId]);
+  }, [q, plantilla]);
 
   useEffect(() => {
     function fuera(e: PointerEvent) {
@@ -54,7 +57,7 @@ export function BuscadorPedido({ estacionId }: { estacionId: string }) {
     setAbierto(false);
     setQ("");
     setResultados(null);
-    router.push(`/planificacion?estacion=${encodeURIComponent(estacionId)}&semana=${r.semana_inicio}&item=${r.item_id}`);
+    router.push(`/planificacion?plantilla=${encodeURIComponent(plantilla)}&semana=${r.semana_inicio}&item=${r.item_id}`);
   }
 
   const hay = q.trim() !== "";
@@ -66,8 +69,8 @@ export function BuscadorPedido({ estacionId }: { estacionId: string }) {
         role="combobox"
         aria-expanded={abierto && hay}
         aria-controls="resultados-busqueda-pedido"
-        aria-label="Buscar un pedido en la planificación"
-        placeholder="Buscar por N° de pedido…"
+        aria-label="Buscar un N° TW en la planificación"
+        placeholder="Buscar por N° TW…"
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -90,13 +93,17 @@ export function BuscadorPedido({ estacionId }: { estacionId: string }) {
         <ul id="resultados-busqueda-pedido" role="listbox" className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-lg border bg-popover p-1 shadow-lg">
           {error && <li className="px-3 py-2 text-sm text-destructive">{error}</li>}
           {!error && resultados === null && <li className="px-3 py-2 text-sm text-muted-foreground">Buscando…</li>}
-          {!error && resultados !== null && resultados.length === 0 && <li className="px-3 py-2 text-sm text-muted-foreground">Ningún pedido de esta planificación coincide.</li>}
+          {!error && resultados !== null && resultados.length === 0 && <li className="px-3 py-2 text-sm text-muted-foreground">Ningún N° TW de esta planificación coincide.</li>}
           {resultados?.map((r) => (
             <li key={r.item_id} role="option" aria-selected={false}>
               <button type="button" onClick={() => ir(r)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-muted">
-                <span className="font-medium">{r.codigo_pedido}</span>
+                <span className="min-w-0">
+                  <span className="font-medium">{r.n_tw}</span>
+                  {r.cliente && <span className="ml-2 truncate text-xs text-muted-foreground">{r.cliente}</span>}
+                  {r.sin_pedido && <span className="ml-2 text-xs text-amber-700 dark:text-amber-400">sin pedido</span>}
+                </span>
                 <span className="text-xs text-muted-foreground">
-                  {ETIQUETA_TIPO[r.tipo]} · semana del {fechaCorta(r.semana_inicio)}
+                  {r.dia ? `${NOMBRES_DIA[diaIdx(r.dia)]} ${fechaCorta(r.dia)} · ` : ""}semana del {fechaCorta(r.semana_inicio)}
                 </span>
               </button>
             </li>
