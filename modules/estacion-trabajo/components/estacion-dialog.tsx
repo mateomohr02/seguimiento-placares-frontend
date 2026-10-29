@@ -139,7 +139,7 @@ export function EstacionDialog({
                 ))}
               </select>
             </Campo>
-            <Campo etiqueta="Plantilla de planificación">
+            <Campo etiqueta="Planificación">
               <select
                 value={v.plantilla_planificacion ?? ""}
                 onChange={(e) => setV((p) => ({ ...p, plantilla_planificacion: (e.target.value || null) as PlantillaPlanificacion | null }))}
@@ -152,7 +152,7 @@ export function EstacionDialog({
                   </option>
                 ))}
               </select>
-              <span className="text-xs text-muted-foreground">Con plantilla, la estación tiene su propia planificación semanal; sin ella no aparece en Planificación.</span>
+              <span className="text-xs text-muted-foreground">La planificación que ven los operarios de esta estación. Varias estaciones pueden tener la misma.</span>
             </Campo>
           </div>
 

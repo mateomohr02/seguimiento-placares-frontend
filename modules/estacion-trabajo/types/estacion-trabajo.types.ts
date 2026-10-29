@@ -19,7 +19,7 @@ export interface EstacionTrabajo {
   planillas: Estacion[];
   /** Estado de producción que marca en la planificación (null = ninguno). */
   estado_id: string | null;
-  /** Plantilla de planificación de la estación (null = sin planificación). */
+  /** Planificación asignada a la estación (null = ninguna). Varias estaciones pueden tener la misma. */
   plantilla_planificacion: PlantillaPlanificacion | null;
   usuarios: UsuarioDeEstacion[];
 }

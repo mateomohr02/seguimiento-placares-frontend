@@ -50,7 +50,7 @@ function ObservacionDialog({ item, observacion, trigger }: { item: ItemPlanifica
           <DialogHeader>
             <DialogTitle>{observacion ? "Editar observación" : "Agregar observación"}</DialogTitle>
             <DialogDescription>
-              {item.codigo_pedido}. Queda firmada con tu nombre y se guarda el historial de cambios.
+              {item.n_tw}. Queda firmada con tu nombre y se guarda el historial de cambios.
             </DialogDescription>
           </DialogHeader>
           <label className="flex flex-col gap-1 text-sm">
@@ -105,7 +105,7 @@ function HistorialDialog({ item }: { item: ItemPlanificacion }) {
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Historial de observaciones</DialogTitle>
-          <DialogDescription>{item.codigo_pedido}. Incluye las observaciones editadas y borradas.</DialogDescription>
+          <DialogDescription>{item.n_tw}. Incluye las observaciones editadas y borradas.</DialogDescription>
         </DialogHeader>
         {eventos.length === 0 ? (
           <p className="text-sm text-muted-foreground">Todavía no hay observaciones.</p>

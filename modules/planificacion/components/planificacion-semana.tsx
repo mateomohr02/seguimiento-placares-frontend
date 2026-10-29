@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, MessageSquareIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, MessageSquareIcon, PencilIcon, PlusIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmActionButton } from "@/components/confirm-action-button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -12,8 +12,9 @@ import { enviarOrden } from "@/lib/api/enviar-orden";
 import { fechaCorta } from "@/modules/planilla/lib/estaciones";
 import { colorDe, textoSobre } from "../lib/colores";
 import { eliminarItemAction, marcarEstadoAction } from "../actions/planificacion.actions";
-import { ETIQUETA_TIPO, type EstacionPlanificacion, type ItemPlanificacion, type SemanaPlanificacion, type TipoPlanificacion } from "../types/planificacion.types";
+import type { ItemPlanificacion, PlanificacionCatalogo, SemanaPlanificacion } from "../types/planificacion.types";
 import { BuscadorPedido } from "./buscador-pedido";
+import { ImportarDialog } from "./importar-dialog";
 import { FiltroCompromiso, SIN_FECHA, opcionesDeFecha } from "./filtro-compromiso";
 import { ItemDialog } from "./item-dialog";
 import { ObservacionesCelda } from "./observaciones-celda";
@@ -26,7 +27,7 @@ const hora = new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "
 const SELECT =
   "h-11 rounded-lg border border-input bg-background px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm";
 
-const href = (estacionId: string, semana?: string) => `/planificacion?estacion=${encodeURIComponent(estacionId)}${semana ? `&semana=${semana}` : ""}`;
+const href = (clave: string, semana?: string) => `/planificacion?plantilla=${encodeURIComponent(clave)}${semana ? `&semana=${semana}` : ""}`;
 
 // Cliente y N° TW van al pedido; N° orden va a la orden.
 function LinkPedido({ item, children, className }: { item: ItemPlanificacion; children: React.ReactNode; className?: string }) {
@@ -67,7 +68,7 @@ function Estados({ item, data }: { item: ItemPlanificacion; data: SemanaPlanific
             title={marcadoPorMi ? `¿Quitar «${mio.nombre}»?` : `¿Marcar «${mio.nombre}»?`}
             description={
               <>
-                {marcadoPorMi ? "Se quita la marca de" : "Se marca como"} «{mio.nombre}»: {item.codigo_pedido}.
+                {marcadoPorMi ? "Se quita la marca de" : "Se marca como"} «{mio.nombre}»: {item.n_tw}.
               </>
             }
             successMessage={marcadoPorMi ? "Marca quitada." : "Estado marcado."}
@@ -98,7 +99,7 @@ function ObservacionesResumen({ item }: { item: ItemPlanificacion }) {
         />
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Observaciones — {item.codigo_pedido}</DialogTitle>
+            <DialogTitle>Observaciones — {item.n_tw}</DialogTitle>
             <DialogDescription>{item.cliente ?? "Sin cliente"}</DialogDescription>
           </DialogHeader>
           <ObservacionesCelda item={item} />
@@ -108,12 +109,11 @@ function ObservacionesResumen({ item }: { item: ItemPlanificacion }) {
   );
 }
 
-function Acciones({ item, estacion, semana }: { item: ItemPlanificacion; estacion: EstacionPlanificacion; semana: string }) {
+function Acciones({ item, planificacion, semana }: { item: ItemPlanificacion; planificacion: PlanificacionCatalogo; semana: string }) {
   return (
     <div className="flex items-center gap-1">
       <ItemDialog
-        estacionId={estacion.id}
-        tipo={item.tipo}
+        plantilla={planificacion.clave}
         semana={semana}
         item={item}
         trigger={
@@ -128,7 +128,7 @@ function Acciones({ item, estacion, semana }: { item: ItemPlanificacion; estacio
         ariaLabel="Quitar fila"
         label={<Trash2Icon />}
         title="¿Quitar la fila?"
-        description={<>Se quita «{item.codigo_pedido}» de la planificación, con sus marcas.</>}
+        description={<>Se quita «{item.n_tw}» de la planificación, con sus marcas.</>}
         confirmLabel="Quitar"
         successMessage="Fila quitada."
         errorTitle="No se pudo quitar la fila"
@@ -138,30 +138,42 @@ function Acciones({ item, estacion, semana }: { item: ItemPlanificacion; estacio
   );
 }
 
+const NOMBRES_DIA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+
+// Tabla de filas de una semana (Termolaminado) o de un día (Calidad): cada una se ordena por separado con drag and drop.
 function Tabla({
-  tipo,
+  titulo,
+  dia,
+  filas: filasTodas,
   data,
   puedeGestionar,
   itemResaltado,
+  esHoy,
 }: {
-  tipo: TipoPlanificacion;
+  /** Encabezado de la sección (Calidad: «Lunes 26/10/2026»); sin él, solo la barra de resumen. */
+  titulo?: string;
+  /** Calidad: es el día de hoy (se marca con «Hoy»). */
+  esHoy?: boolean;
+  /** Calidad: día de la sección. */
+  dia?: string;
+  filas: ItemPlanificacion[];
   data: SemanaPlanificacion;
   puedeGestionar: boolean;
   itemResaltado: string | null;
 }) {
-  const filas = data.items.filter((i) => i.tipo === tipo).sort((a, b) => a.orden - b.orden);
+  const calidad = data.planificacion.clave === "CALIDAD";
+  const filas = [...filasTodas].sort((a, b) => a.orden - b.orden);
   const { ordenados, mover } = useOrdenOptimista(filas, (ids) =>
-    enviarOrden("/planificacion-api/reordenar", { estacion_id: data.estacion.id, semana: data.semana_inicio, tipo, ids }),
+    enviarOrden("/planificacion-api/reordenar", { plantilla: data.planificacion.clave, semana: data.semana_inicio, ...(dia ? { dia } : {}), ids }),
   );
   const [filtroFecha, setFiltroFecha] = useState<Set<string> | null>(null);
   const opcionesFecha = opcionesDeFecha(filas.map((i) => i.compromiso));
   // Si cambia la semana y ya no existen las fechas filtradas, no queda nada que mostrar: se ignora el filtro.
-  const filtroVigente = filtroFecha && opcionesFecha.some((o) => filtroFecha.has(o.clave)) ? filtroFecha : null;
+  const filtroVigente = !calidad && filtroFecha && opcionesFecha.some((o) => filtroFecha.has(o.clave)) ? filtroFecha : null;
   const visibles = filtroVigente ? ordenados.filter((i) => filtroVigente.has(i.compromiso ?? SIN_FECHA)) : ordenados;
   // Reordenar con filtro activo no tiene sentido (el orden es de toda la lista): sin asas mientras haya filtro.
   const puedeOrdenar = puedeGestionar && !filtroVigente;
-  const reclamos = tipo === "RECLAMOS";
-  const columnas = (reclamos ? 10 : 8) + (puedeGestionar ? 2 : 0);
+  const columnas = (calidad ? 7 : 9) + (puedeGestionar ? 2 : 0);
   const resaltada = useRef<HTMLTableRowElement | null>(null);
 
   useEffect(() => {
@@ -169,11 +181,18 @@ function Tabla({
   }, [itemResaltado]);
 
   return (
-    <section className="flex flex-col gap-2">
+    <section id={dia ? `dia-${dia}` : undefined} className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">
-          {ETIQUETA_TIPO[tipo]} <span className="text-sm font-normal text-muted-foreground">({filas.length})</span>
-        </h2>
+        {titulo ? (
+          <h2 className="text-lg font-semibold">
+            {titulo} <span className="text-sm font-normal text-muted-foreground">({filas.length})</span>
+            {esHoy && <span className="ml-2 rounded-full bg-gold/20 px-2.5 py-0.5 align-middle text-xs font-medium text-gold">Hoy</span>}
+          </h2>
+        ) : (
+          <p className="text-sm font-medium">
+            {filas.length} {filas.length === 1 ? "fila" : "filas"}
+          </p>
+        )}
         {filas.length > 0 && data.estados.length > 0 && (
           <p className="text-sm text-muted-foreground">
             {data.estados.map((e) => `${e.nombre}: ${filas.filter((i) => i.marcas.some((m) => m.estado_id === e.id)).length} de ${filas.length}`).join(" · ")}
@@ -181,9 +200,9 @@ function Tabla({
         )}
         {puedeGestionar && (
           <ItemDialog
-            estacionId={data.estacion.id}
-            tipo={tipo}
+            plantilla={data.planificacion.clave}
             semana={data.semana_inicio}
+            dia={dia}
             trigger={
               <Button variant="outline" className="h-11 px-4">
                 <PlusIcon /> Agregar
@@ -206,20 +225,23 @@ function Tabla({
             <TableRow>
               {puedeGestionar && <TableHead className="w-14" />}
               <TableHead>Cliente</TableHead>
-              {reclamos && <TableHead>Distribuidor</TableHead>}
-              {reclamos && <TableHead>Ticket</TableHead>}
               <TableHead>N° TW</TableHead>
               <TableHead>Estado</TableHead>
-              {!reclamos && <TableHead>N° Orden</TableHead>}
-              {reclamos ? <TableHead>Tipo</TableHead> : <TableHead>Modelo</TableHead>}
-              <TableHead>Color</TableHead>
-              <TableHead>
-                <span className="inline-flex items-center gap-1">
-                  Compromiso
-                  <FiltroCompromiso opciones={opcionesFecha} seleccion={filtroVigente} onChange={setFiltroFecha} />
-                </span>
-              </TableHead>
-              {reclamos && <TableHead>Finalizado</TableHead>}
+              <TableHead>N° Orden</TableHead>
+              <TableHead>Modelo</TableHead>
+              {calidad ? (
+                <TableHead>Módulos</TableHead>
+              ) : (
+                <>
+                  <TableHead>Color</TableHead>
+                  <TableHead>
+                    <span className="inline-flex items-center gap-1">
+                      Compromiso
+                      <FiltroCompromiso opciones={opcionesFecha} seleccion={filtroVigente} onChange={setFiltroFecha} />
+                    </span>
+                  </TableHead>
+                </>
+              )}
               <TableHead>Observaciones</TableHead>
               {puedeGestionar && <TableHead />}
             </TableRow>
@@ -228,11 +250,7 @@ function Tabla({
             {visibles.length === 0 && (
               <TableRow>
                 <TableCell colSpan={columnas} className="py-8 text-center text-muted-foreground">
-                  {ordenados.length > 0
-                    ? "Ninguna fila coincide con el filtro."
-                    : reclamos
-                      ? "No hay reclamos cargados para esta semana."
-                      : "No hay pedidos cargados para esta semana."}
+                  {ordenados.length > 0 ? "Ninguna fila coincide con el filtro." : calidad ? "No hay filas cargadas para este día." : "No hay pedidos cargados para esta semana."}
                 </TableCell>
               </TableRow>
             )}
@@ -252,47 +270,49 @@ function Tabla({
                     {(asa) => (
                       <>
                         {puedeGestionar && <TableCell className="w-14">{asa}</TableCell>}
-
                         <TableCell className="max-w-48 font-medium">
                           <LinkPedido item={i} className="block truncate">
                             <span title={i.cliente ?? undefined}>{v(i.cliente)}</span>
                           </LinkPedido>
                         </TableCell>
-                        {reclamos && <TableCell className="max-w-36 truncate">{v(i.distribuidor)}</TableCell>}
-                        {reclamos && <TableCell className="whitespace-nowrap">{v(i.ticket)}</TableCell>}
                         <TableCell className="font-medium whitespace-nowrap">
-                          <LinkPedido item={i}>{i.codigo_pedido}</LinkPedido>
+                          <LinkPedido item={i}>{i.n_tw}</LinkPedido>
+                          {i.sin_pedido && (
+                            <span
+                              title="El N° TW no existe en la app: la fila no está asociada a ningún pedido (sin links ni N° de orden). Editala para asociarla cuando el pedido esté cargado."
+                              className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+                            >
+                              <TriangleAlertIcon className="size-3" /> Pedido no encontrado
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="min-w-40">
                           <Estados item={i} data={data} />
                         </TableCell>
-                        {!reclamos && (
-                          <TableCell className="whitespace-nowrap">
-                            {i.orden_id && i.n_orden ? (
-                              <Link href={`/ordenes/${i.orden_id}`} className="hover:underline">
-                                {i.n_orden}
-                              </Link>
-                            ) : (
-                              v(i.n_orden)
-                            )}
-                          </TableCell>
-                        )}
-                        {reclamos ? (
-                          <TableCell className="max-w-44 truncate" title={i.tipo_reclamo ?? undefined}>
-                            {v(i.tipo_reclamo)}
-                          </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {i.orden_id && i.n_orden ? (
+                            <Link href={`/ordenes/${i.orden_id}`} className="hover:underline">
+                              {i.n_orden}
+                            </Link>
+                          ) : (
+                            v(i.n_orden)
+                          )}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{v(i.modelo)}</TableCell>
+                        {calidad ? (
+                          <TableCell className="whitespace-nowrap">{i.modulos === null ? "—" : i.modulos}</TableCell>
                         ) : (
-                          <TableCell className="whitespace-nowrap">{v(i.modelo)}</TableCell>
+                          <>
+                            <TableCell className="whitespace-nowrap">{v(i.color)}</TableCell>
+                            <TableCell className="whitespace-nowrap">{f(i.compromiso)}</TableCell>
+                          </>
                         )}
-                        <TableCell className="whitespace-nowrap">{v(i.color)}</TableCell>
-                        <TableCell className="whitespace-nowrap">{f(i.compromiso)}</TableCell>
-                        {reclamos && <TableCell className="whitespace-nowrap">{f(i.finalizado_en)}</TableCell>}
                         <TableCell>
                           <ObservacionesResumen item={i} />
                         </TableCell>
                         {puedeGestionar && (
                           <TableCell>
-                            <Acciones item={i} estacion={data.estacion} semana={data.semana_inicio} />
+                            <Acciones item={i} planificacion={data.planificacion} semana={data.semana_inicio} />
                           </TableCell>
                         )}
                       </>
@@ -308,44 +328,69 @@ function Tabla({
   );
 }
 
-// Planificación de una semana de una estación (pedidos y reclamos) con el marcado de estados de producción.
+// Planificación (Termolaminado o Calidad) de una semana: Termolaminado (una tabla, lunes a viernes) o Calidad (seis días, lunes a sábado), con el
+// marcado de estados de producción.
 export function PlanificacionSemana({
   data,
-  estaciones,
+  planificaciones,
   puedeGestionar,
   semanaActual,
   itemResaltado,
 }: {
   data: SemanaPlanificacion;
-  estaciones: EstacionPlanificacion[];
+  planificaciones: PlanificacionCatalogo[];
   puedeGestionar: boolean;
   semanaActual: string;
   itemResaltado: string | null;
 }) {
-  const est = data.estacion.id;
+  const est = data.planificacion.clave;
   const anterior = mas(data.semana_inicio, -7);
   const siguiente = mas(data.semana_inicio, 7);
   const esActual = data.semana_inicio === semanaActual;
   const otras = data.semanas.filter((s) => s !== data.semana_inicio);
+  const calidad = est === "CALIDAD";
+  const ultimoDia = calidad ? 5 : 4; // Calidad: lunes a sábado; Termolaminado: lunes a viernes
+
+  // Día de hoy según el reloj del dispositivo (no el del servidor, que está en UTC). Solo en el navegador: en el servidor es null.
+  const hoy = useSyncExternalStore(
+    () => () => {},
+    () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    },
+    () => null,
+  );
+  const hoyEnSemana = calidad && hoy !== null && NOMBRES_DIA.some((_, n) => mas(data.semana_inicio, n) === hoy);
+
+  // Al entrar a la semana actual de Calidad, se baja hasta el día de hoy y se lo centra (si se llegó por el buscador manda la fila buscada).
+  useEffect(() => {
+    if (!hoyEnSemana || itemResaltado) return;
+    document.getElementById(`dia-${hoy}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [hoyEnSemana, hoy, itemResaltado, data.semana_inicio]);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Planificación semanal — {data.estacion.nombre}</h1>
-          <p className="text-sm text-muted-foreground">Pedidos y reclamos de la semana que carga la oficina técnica.</p>
+          <h1 className="text-xl font-semibold">Planificación semanal — {data.planificacion.nombre}</h1>
+          <p className="text-sm text-muted-foreground">
+            {calidad ? "Planificación de Calidad por día, del lunes al sábado, que carga la oficina técnica." : "Pedidos de la semana que carga la oficina técnica."}
+          </p>
         </div>
-        <BuscadorPedido estacionId={est} />
+        <div className="flex flex-wrap items-center gap-2">
+          {puedeGestionar && <ImportarDialog />}
+          <BuscadorPedido plantilla={est} />
+        </div>
       </div>
 
-      {estaciones.length > 1 && (
-        <nav aria-label="Estación de trabajo" className="flex flex-wrap gap-2">
-          {estaciones.map((e) => (
+      {planificaciones.length > 1 && (
+        <nav aria-label="Planificación" className="flex flex-wrap gap-2">
+          {planificaciones.map((e) => (
             <Link
-              key={e.id}
-              href={href(e.id)}
-              aria-current={e.id === est ? "page" : undefined}
-              className={`inline-flex h-11 items-center rounded-lg border px-4 text-sm font-medium ${e.id === est ? "border-transparent bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+              key={e.clave}
+              href={href(e.clave)}
+              aria-current={e.clave === est ? "page" : undefined}
+              className={`inline-flex h-11 items-center rounded-lg border px-4 text-sm font-medium ${e.clave === est ? "border-transparent bg-primary text-primary-foreground" : "hover:bg-muted"}`}
             >
               {e.nombre}
             </Link>
@@ -359,7 +404,7 @@ export function PlanificacionSemana({
         </Link>
         <div className="flex min-w-0 flex-col px-1">
           <span className="text-lg leading-tight font-semibold">
-            Semana del {fechaCorta(data.semana_inicio)} al {fechaCorta(mas(data.semana_inicio, 4))}
+            Semana del {fechaCorta(data.semana_inicio)} al {fechaCorta(mas(data.semana_inicio, ultimoDia))}
           </span>
           {esActual && <span className="text-xs font-medium text-gold">Esta semana</span>}
         </div>
@@ -373,7 +418,7 @@ export function PlanificacionSemana({
         )}
         {otras.length > 0 && (
           <form action="/planificacion" method="get" className="ml-auto">
-            <input type="hidden" name="estacion" value={est} />
+            <input type="hidden" name="plantilla" value={est} />
             <select
               name="semana"
               defaultValue=""
@@ -386,7 +431,7 @@ export function PlanificacionSemana({
               </option>
               {otras.map((s) => (
                 <option key={s} value={s}>
-                  {fechaCorta(s)} al {fechaCorta(mas(s, 4))}
+                  {fechaCorta(s)} al {fechaCorta(mas(s, ultimoDia))}
                 </option>
               ))}
             </select>
@@ -399,7 +444,7 @@ export function PlanificacionSemana({
           "Ninguna de tus estaciones de trabajo tiene un estado de producción (o no estás en ninguna): podés ver la planificación pero no marcar. Pedile a técnica que te asigne a una estación con estado."
         ) : data.mis_estados.length === 1 ? (
           <>
-            El estado de producción de tu estación es <strong>«{data.mis_estados[0].nombre}»</strong>: marcalo en cada pedido cuando termine en tu estación.
+            El estado de producción de tu estación es <strong>«{data.mis_estados[0].nombre}»</strong>: marcalo en cada fila cuando termine en tu estación.
           </>
         ) : (
           <>
@@ -409,13 +454,30 @@ export function PlanificacionSemana({
                 <strong>«{e.nombre}»</strong>
               </span>
             ))}
-            . En cada pedido elegí cuál marcar (un botón por estado).
+            . En cada fila elegí cuál marcar (un botón por estado).
           </>
         )}
       </p>
 
-      <Tabla tipo="PEDIDOS" data={data} puedeGestionar={puedeGestionar} itemResaltado={itemResaltado} />
-      <Tabla tipo="RECLAMOS" data={data} puedeGestionar={puedeGestionar} itemResaltado={itemResaltado} />
+      {calidad ? (
+        NOMBRES_DIA.map((nombre, n) => {
+          const dia = mas(data.semana_inicio, n);
+          return (
+            <Tabla
+              key={dia}
+              titulo={`${nombre} ${fechaCorta(dia)}`}
+              dia={dia}
+              esHoy={dia === hoy}
+              filas={data.items.filter((i) => i.dia === dia)}
+              data={data}
+              puedeGestionar={puedeGestionar}
+              itemResaltado={itemResaltado}
+            />
+          );
+        })
+      ) : (
+        <Tabla filas={data.items} data={data} puedeGestionar={puedeGestionar} itemResaltado={itemResaltado} />
+      )}
     </div>
   );
 }

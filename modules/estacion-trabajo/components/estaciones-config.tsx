@@ -121,7 +121,7 @@ export function EstacionesConfig({
                   </dd>
                 </div>
                 <div>
-                  <dt className="font-medium">Plantilla de planificación</dt>
+                  <dt className="font-medium">Planificación</dt>
                   <dd className="text-muted-foreground">{e.plantilla_planificacion ? ETIQUETA_PLANTILLA[e.plantilla_planificacion] : "Ninguna"}</dd>
                 </div>
                 <div>
