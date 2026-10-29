@@ -14,6 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { FilaOrdenable, ListaOrdenable, useOrdenOptimista } from "@/components/filas-ordenables";
+import { enviarOrden } from "@/lib/api/enviar-orden";
 import { LINEA_LABEL, type Linea } from "@/lib/linea";
 import type { Orden } from "../types/orden.types";
 import { OrdenAcciones } from "./orden-acciones";
@@ -43,15 +45,20 @@ export function OrdenesTable({
 }) {
   const [query, setQuery] = useState("");
 
+  // Orden compartido (cartera): se reordena lo visible; con una búsqueda de texto activa no, para no ordenar a ciegas.
+  const { ordenados, mover } = useOrdenOptimista(ordenes, (ids) => enviarOrden("/ordenes-api/reordenar", { ids }));
+  const buscando = query.trim() !== "";
+  const puedeOrdenar = puedeGestionar && !buscando;
+
   const filtradas = useMemo(() => {
     const q = normalize(query.trim());
-    if (!q) return ordenes;
-    return ordenes.filter(
+    if (!q) return ordenados;
+    return ordenados.filter(
       (o) =>
         normalize(`${o.numeroOrdenCustom} ${o.codigoOrdenFabricacion} ${o.descripcion}`).includes(q) ||
         o.codigosPedido.some((c) => normalize(c).includes(q)),
     );
-  }, [ordenes, query]);
+  }, [ordenados, query]);
 
   // Pedidos que coinciden con la búsqueda (para mostrar por qué apareció la orden).
   const pedidosCoincidentes = (orden: Orden) => {
@@ -90,9 +97,17 @@ export function OrdenesTable({
           className="pl-8"
         />
       </div>
+      {puedeGestionar && (
+        <p className="text-xs text-muted-foreground">
+          {buscando
+            ? "Para reordenar la lista, borrá la búsqueda."
+            : "Arrastrá una orden por el ícono ⋮⋮ para cambiar su lugar. El orden lo ven todos los usuarios."}
+        </p>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
+            {puedeOrdenar && <TableHead className="w-14" />}
             <TableHead>N° orden</TableHead>
             <TableHead>Descripción</TableHead>
             <TableHead>Pedidos</TableHead>
@@ -103,13 +118,16 @@ export function OrdenesTable({
         <TableBody>
           {filtradas.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={puedeOrdenar ? 6 : 5} className="text-center text-muted-foreground">
                 Ninguna orden coincide con &quot;{query}&quot;.
               </TableCell>
             </TableRow>
           )}
+          <ListaOrdenable ids={filtradas.map((o) => o.id)} onMover={mover}>
           {filtradas.map((orden) => (
-            <TableRow key={orden.id}>
+            <FilaOrdenable key={orden.id} id={orden.id} habilitado={puedeOrdenar}>
+              {(asa) => (<>
+              {puedeOrdenar && <TableCell className="w-14">{asa}</TableCell>}
               <TableCell className="font-medium">
                 <Link href={`/ordenes/${orden.id}`} className="hover:underline">
                   {orden.numeroOrdenCustom}
@@ -137,8 +155,10 @@ export function OrdenesTable({
               <TableCell className="text-right">
                 {puedeGestionar && <OrdenAcciones orden={orden} archivada={archivadas} />}
               </TableCell>
-            </TableRow>
+              </>)}
+            </FilaOrdenable>
           ))}
+          </ListaOrdenable>
         </TableBody>
       </Table>
     </div>

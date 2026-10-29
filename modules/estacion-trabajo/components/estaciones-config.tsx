@@ -1,5 +1,6 @@
 "use client";
 
+import { ETIQUETA_PLANTILLA } from "@/modules/planificacion/types/planificacion.types";
 import { useState } from "react";
 import { PencilIcon, PlusIcon, PowerIcon, PowerOffIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -107,7 +108,7 @@ export function EstacionesConfig({
                 </div>
               </div>
 
-              <dl className="grid gap-3 text-sm md:grid-cols-3">
+              <dl className="grid gap-3 text-sm md:grid-cols-4">
                 <div>
                   <dt className="font-medium">Planillas</dt>
                   <dd className="text-muted-foreground">{e.planillas.length > 0 ? e.planillas.map((p) => ETIQUETA_ESTACION[p] ?? p).join(" · ") : "Ninguna"}</dd>
@@ -118,6 +119,10 @@ export function EstacionesConfig({
                     {estado?.color && <span className="size-3 rounded-full" style={{ backgroundColor: estado.color }} aria-hidden />}
                     {estado?.nombre ?? "Ninguno"}
                   </dd>
+                </div>
+                <div>
+                  <dt className="font-medium">Planificación</dt>
+                  <dd className="text-muted-foreground">{e.plantilla_planificacion ? ETIQUETA_PLANTILLA[e.plantilla_planificacion] : "Ninguna"}</dd>
                 </div>
                 <div>
                   <dt className="font-medium">Operarios</dt>

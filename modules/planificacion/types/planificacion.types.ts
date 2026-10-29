@@ -1,10 +1,10 @@
-// Planificación semanal de Termolaminado cargada por sistema (diseño.md §14.4).
-export type TipoPlanificacion = "PEDIDOS" | "RECLAMOS";
+// Planificaciones cargadas por sistema (diseño.md §14.4, §19.5): son independientes de las estaciones de trabajo. Catálogo fijo:
+// Termolaminado (por semana, lunes a viernes) y Calidad (por día, lunes a sábado). Una estación solo tiene «asignada» una planificación.
+// Para agregar otra: sumar su clave acá, en ETIQUETA_PLANTILLA y en el backend (enum PlantillaPlanificacion).
 
-export const ETIQUETA_TIPO: Record<TipoPlanificacion, string> = {
-  PEDIDOS: "Pedidos",
-  RECLAMOS: "Reclamos",
-};
+/** Planificaciones del catálogo (clave). */
+export type PlantillaPlanificacion = "TERMOLAMINADO" | "CALIDAD";
+export const ETIQUETA_PLANTILLA: Record<PlantillaPlanificacion, string> = { TERMOLAMINADO: "Termolaminado", CALIDAD: "Calidad" };
 
 export interface MarcaPlanificacion {
   estado_id: string;
@@ -40,22 +40,28 @@ export interface ObservacionPlanificacion {
 
 export interface ItemPlanificacion {
   id: string;
-  tipo: TipoPlanificacion;
   /** Lunes de la semana (AAAA-MM-DD). */
   semana_inicio: string;
-  cliente: string;
+  /** Día de la fila (AAAA-MM-DD, lunes a sábado): solo en la plantilla Calidad. */
+  dia: string | null;
+  /** Pedido cargado en la app al que está asociada la fila (null = «pedido no encontrado»). */
+  pedido_id: string | null;
+  orden_id: string | null;
+  sin_pedido: boolean;
+  /** N° TW tal cual (con pedido asociado es el código del pedido). */
   n_tw: string;
+  /** Con pedido sale de la orden; sin pedido es el texto guardado. */
   n_orden: string | null;
+  /** Cliente: texto libre. */
+  cliente: string | null;
   modelo: string | null;
+  /** Solo Termolaminado. */
   color: string | null;
-  fabrica: string | null;
-  fecha_limite: string | null;
-  distribuidor: string | null;
-  ticket: string | null;
-  tipo_reclamo: string | null;
   compromiso: string | null;
-  finalizado_en: string | null;
+  /** Cantidad de módulos: solo Calidad. */
+  modulos: number | null;
   observaciones: string | null;
+  orden: number;
   marcas: MarcaPlanificacion[];
   comentarios: ObservacionPlanificacion[];
 }
@@ -66,30 +72,133 @@ export interface EstadoBasico {
   color: string | null;
 }
 
+/** Planificación del catálogo, tal como la devuelve GET /planificacion/planificaciones. */
+export interface PlanificacionCatalogo {
+  clave: PlantillaPlanificacion;
+  nombre: string;
+}
+
 export interface SemanaPlanificacion {
+  planificacion: PlanificacionCatalogo;
   semana_inicio: string;
   semanas: string[];
   estados: EstadoBasico[];
-  /** Estados de producción que el usuario puede marcar: los de sus estaciones de trabajo (vacío = no puede marcar). */
+  /** Estados de producción que el usuario puede marcar: los de sus estaciones activas (vacío = no puede marcar). */
   mis_estados: EstadoBasico[];
   items: ItemPlanificacion[];
 }
 
-/** Lo que se manda al crear o editar una fila (los vacíos llegan como cadena vacía). */
+/**
+ * Cuerpo de POST/PUT /planificacion/items. `dia` y `modulos` solo en Calidad; `color` y `compromiso` solo en Termolaminado.
+ * `pedido_id` solo si el usuario eligió un pedido de la lista; si no, el backend busca el N° TW exacto.
+ */
 export interface ItemInput {
-  tipo: TipoPlanificacion;
+  plantilla: PlantillaPlanificacion;
   semana: string;
+  dia?: string;
+  n_tw: string;
+  pedido_id?: string;
+  cliente: string;
+  modelo: string;
+  color?: string;
+  compromiso?: string;
+  modulos?: number;
+  observaciones: string;
+}
+
+/** Resultado de GET /planificacion/pedidos y GET /planificacion/pedido (lista y validación del N° TW del diálogo de fila). */
+export interface PedidoElegible {
+  pedido_id: string;
+  codigo_pedido: string;
+  referencia: string | null;
+  orden_id: string | null;
+  n_orden: string | null;
+}
+
+/** Resultado de GET /planificacion/buscar (buscador de la planificación). */
+export interface ResultadoBusqueda {
+  item_id: string;
+  semana_inicio: string;
+  dia: string | null;
+  n_tw: string;
+  cliente: string | null;
+  sin_pedido: boolean;
+}
+
+// ---- Importador de planificación desde Excel (POST /planificacion/importar/previsualizar y /confirmar) ----
+
+export type EstadoFilaImportada = "OK" | "SIN_PEDIDO" | "DUPLICADA" | "INVALIDA";
+
+export interface FilaImportada {
+  /** Id estable de la fila dentro de la respuesta. */
+  clave: string;
+  fila_excel: number;
+  /** Calidad: día de la fila (AAAA-MM-DD). */
+  dia: string | null;
   cliente: string;
   n_tw: string;
-  n_orden: string;
   modelo: string;
   color: string;
-  fabrica: string;
-  fecha_limite: string;
-  distribuidor: string;
-  ticket: string;
-  tipo_reclamo: string;
-  compromiso: string;
-  finalizado_en: string;
+  /** AAAA-MM-DD o null. */
+  compromiso: string | null;
+  modulos: number | null;
   observaciones: string;
+  pedido: { pedido_id: string; n_orden: string | null } | null;
+  estado: EstadoFilaImportada;
+  avisos: string[];
+  /** Ya está vigente en esa semana/día de la planificación (para «agregar solo las nuevas»). */
+  ya_existe: boolean;
+}
+
+export interface HojaImportada {
+  nombre_hoja: string;
+  /** Planificación de destino (por el nombre de la hoja); null = no hay una planificación con ese nombre. */
+  planificacion: PlanificacionCatalogo | null;
+  omitida: boolean;
+  motivo?: string;
+  /** Lo que la planificación ya tiene vigente en esa semana. */
+  existente: { filas: number; marcas: number; observaciones: number };
+  filas: FilaImportada[];
+}
+
+export interface Previsualizacion {
+  archivo: string;
+  semana_inicio: string;
+  hojas: HojaImportada[];
+  avisos: string[];
+}
+
+export type ModoImportacion = "pisar" | "agregar";
+
+export interface ConfirmarImportacionInput {
+  semana: string;
+  sin_pedido: "cargar" | "excluir";
+  hojas: {
+    plantilla: PlantillaPlanificacion;
+    modo: ModoImportacion;
+    filas: {
+      dia?: string;
+      cliente: string;
+      n_tw: string;
+      modelo?: string;
+      color?: string;
+      compromiso?: string;
+      modulos?: number;
+      observaciones?: string;
+    }[];
+  }[];
+}
+
+export interface ResultadoImportacion {
+  semana_inicio: string;
+  planificaciones: {
+    clave: PlantillaPlanificacion;
+    nombre: string;
+    cargadas: number;
+    sin_pedido: number;
+    excluidas: number;
+    ya_existentes_omitidas: number;
+    quitadas: number;
+    avisos: string[];
+  }[];
 }
